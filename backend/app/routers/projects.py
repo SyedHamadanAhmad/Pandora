@@ -9,11 +9,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.middleware.session_auth import get_current_user_id
 from app.models.project import Project
+from app.schemas.component import ComponentListResponse
 from app.schemas.project import (
     CreateProjectRequest,
     ProjectListResponse,
     ProjectResponse,
 )
+from app.schemas.showcase import ShowcaseListResponse
 from pandora_shared.enums import ProjectStatus
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
@@ -73,6 +75,26 @@ async def list_projects(
     return ProjectListResponse(
         projects=[ProjectResponse.model_validate(p) for p in projects]
     )
+
+
+@router.get("/{project_id}/components", response_model=ComponentListResponse)
+async def list_components(
+    project_id: int,
+    user_id: int = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
+) -> ComponentListResponse:
+    await _get_project_for_user(db, project_id, user_id)
+    return ComponentListResponse(components=[])
+
+
+@router.get("/{project_id}/showcase", response_model=ShowcaseListResponse)
+async def list_showcase_scenes(
+    project_id: int,
+    user_id: int = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
+) -> ShowcaseListResponse:
+    await _get_project_for_user(db, project_id, user_id)
+    return ShowcaseListResponse(scenes=[])
 
 
 @router.get("/{project_id}", response_model=ProjectResponse)

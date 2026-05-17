@@ -55,6 +55,14 @@ class ProjectRouteTests(unittest.IsolatedAsyncioTestCase):
             missing = await client.get("/api/projects/999999999")
             self.assertEqual(missing.status_code, 404)
 
+            components = await client.get(f"/api/projects/{project_id}/components")
+            self.assertEqual(components.status_code, 200)
+            self.assertEqual(components.json(), {"components": []})
+
+            showcase = await client.get(f"/api/projects/{project_id}/showcase")
+            self.assertEqual(showcase.status_code, 200)
+            self.assertEqual(showcase.json(), {"scenes": []})
+
         async with AsyncClient(
             transport=ASGITransport(app=app),
             base_url="http://test",
