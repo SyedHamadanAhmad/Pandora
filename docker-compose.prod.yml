@@ -1,0 +1,5 @@
+# Production port exposure — use with: make up
+services:
+  frontend:
+    ports:
+      - "3000:80"

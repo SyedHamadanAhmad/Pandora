@@ -1,0 +1,3 @@
+-r requirements.base.txt
+crawl4ai==0.4.247
+playwright==1.49.1
