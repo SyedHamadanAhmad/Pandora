@@ -1,7 +1,7 @@
 COMPOSE := docker compose
 COMPOSE_DEV := $(COMPOSE) -f docker-compose.yml -f docker-compose.dev.yml
 
-.PHONY: dev up down logs migrate test shell scale-component check-env
+.PHONY: dev up down logs migrate test test-integration phase2-gate shell scale-component check-env
 
 check-env:
 	@test -f .env || (echo "Missing .env — run: cp .env.example .env" && exit 1)
@@ -21,8 +21,21 @@ logs:
 migrate: check-env
 	$(COMPOSE) run --rm backend-migrate alembic upgrade head
 
-test:
-	@echo "Integration tests — implemented in Phase 9"
+test: test-integration
+
+test-integration: check-env
+	$(COMPOSE) -f docker-compose.yml -f docker-compose.dev.yml run --rm backend \
+		pytest tests/integration/ -v
+
+phase2-gate: check-env
+	@chmod +x scripts/phase2_gate.sh
+	@if curl -sf http://localhost:8000/health >/dev/null 2>&1; then \
+		BASE_URL=http://localhost:8000 ./scripts/phase2_gate.sh; \
+	else \
+		echo "localhost:8000 not reachable — running gate inside backend container..."; \
+		$(COMPOSE) -f docker-compose.yml -f docker-compose.dev.yml exec -T backend \
+			env BASE_URL=http://127.0.0.1:8000 ./scripts/phase2_gate.sh; \
+	fi
 
 test-e2e:
 	@echo "E2E tests — implemented in Phase 9 (requires DEEPSEEK_API_KEY)"

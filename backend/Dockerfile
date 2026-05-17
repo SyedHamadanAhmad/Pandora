@@ -13,6 +13,8 @@ COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY backend /app
+COPY scripts/phase2_gate.sh /app/scripts/phase2_gate.sh
+RUN chmod +x /app/scripts/phase2_gate.sh
 
 EXPOSE 8000
 
