@@ -6,7 +6,7 @@ from sqlalchemy import text
 
 from app import rabbitmq
 from app.database import async_session, engine
-from app.routers import auth_router, projects_router
+from app.routers import auth_router, projects_router, thread_router
 from app.services.message_broker import MessageBroker
 
 
@@ -27,6 +27,7 @@ app = FastAPI(title="Pandora API", version="0.1.0", lifespan=lifespan)
 
 app.include_router(auth_router)
 app.include_router(projects_router)
+app.include_router(thread_router)
 
 app.add_middleware(
     CORSMiddleware,
