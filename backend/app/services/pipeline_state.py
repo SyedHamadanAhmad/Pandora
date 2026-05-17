@@ -22,7 +22,7 @@ from pandora_shared.enums import ComponentStatus, ProjectStatus
 
 logger = logging.getLogger(__name__)
 
-PARSE_TIMEOUT_SECONDS = 30
+PARSE_TIMEOUT_SECONDS = 60
 
 ParseSource = str  # "text" | "image" | "url"
 
@@ -108,7 +108,7 @@ def init_state_from_thread(
 
 
 def schedule_parse_timeouts(pipeline_id: UUID) -> None:
-    """Start 30s watchdog tasks for each pending parse source (requires running event loop)."""
+    """Start 60s watchdog tasks for each pending parse source (requires running event loop)."""
     state = get_state(pipeline_id)
     for source in list(state.parse_pending):
         task = asyncio.create_task(
