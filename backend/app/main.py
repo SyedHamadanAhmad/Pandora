@@ -6,6 +6,7 @@ from sqlalchemy import text
 
 from app import rabbitmq
 from app.database import async_session, engine
+from app.services.message_broker import MessageBroker
 
 
 @asynccontextmanager
@@ -14,6 +15,8 @@ async def lifespan(app: FastAPI):
     channel = await connection.channel()
     await rabbitmq.declare_topology(channel)
     app.state.rabbitmq_connection = connection
+    app.state.rabbitmq_channel = channel
+    app.state.message_broker = MessageBroker(channel)
     yield
     await connection.close()
     await engine.dispose()
