@@ -8,6 +8,7 @@ from uuid import uuid4
 from httpx import ASGITransport, AsyncClient
 
 from app.main import app
+from app.services.message_broker import MessageBroker
 
 
 class ThreadRouteTests(unittest.IsolatedAsyncioTestCase):
@@ -36,9 +37,19 @@ class ThreadRouteTests(unittest.IsolatedAsyncioTestCase):
             b"\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89"
         )
 
-        with patch(
-            "app.services.storage_service._put_object",
-            return_value=None,
+        class _FakeExchange:
+            async def publish(self, message, routing_key: str) -> None:
+                return None
+
+        fake_channel = type("Ch", (), {"default_exchange": _FakeExchange()})()
+        app.state.message_broker = MessageBroker(fake_channel)  # type: ignore[arg-type]
+
+        with (
+            patch("app.services.storage_service._put_object", return_value=None),
+            patch(
+                "app.services.pipeline_service.copy_thread_images_to_pipeline",
+                side_effect=lambda _pid, _plid, urls: urls,
+            ),
         ):
             async with AsyncClient(
                 transport=ASGITransport(app=app),
@@ -66,7 +77,8 @@ class ThreadRouteTests(unittest.IsolatedAsyncioTestCase):
                 body = create.json()
                 self.assertIn("messageId", body)
                 self.assertIn("createdAt", body)
-                self.assertNotIn("pipelineId", body)
+                self.assertIn("pipelineId", body)
+                self.assertEqual(body["status"], "running")
 
                 history = await client.get(f"/api/projects/{project_id}/thread/")
                 self.assertEqual(history.status_code, 200)
@@ -75,7 +87,7 @@ class ThreadRouteTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(messages[0]["content"], "Modern SaaS dashboard")
                 self.assertEqual(messages[0]["inputUrls"], ["https://example.com"])
                 self.assertEqual(len(messages[0]["inputImageUrls"]), 1)
-                self.assertIsNone(messages[0]["pipelineId"])
+                self.assertEqual(messages[0]["pipelineId"], body["pipelineId"])
 
 
 if __name__ == "__main__":

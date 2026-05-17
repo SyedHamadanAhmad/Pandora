@@ -7,9 +7,11 @@ import io
 import os
 from functools import lru_cache
 from urllib.parse import urlparse
+from uuid import UUID
 
 from fastapi import UploadFile
 from minio import Minio
+from minio.commonconfig import CopySource
 
 from app.config import settings
 
@@ -62,6 +64,25 @@ def build_object_key(project_id: int, message_id: int, filename: str) -> str:
     return f"{project_id}/messages/{message_id}/{safe_name}"
 
 
+def build_pipeline_object_key(project_id: int, pipeline_id: UUID, filename: str) -> str:
+    """Object key for Phase 3: {project_id}/{pipeline_id}/{filename}."""
+    safe_name = sanitize_filename(filename)
+    return f"{project_id}/{pipeline_id}/{safe_name}"
+
+
+def object_key_from_url(url: str) -> str:
+    """Extract object key from a URL stored in ``input_image_urls``."""
+    prefix = f"{settings.minio_bucket}/"
+    idx = url.find(prefix)
+    if idx == -1:
+        parsed = urlparse(url)
+        path = parsed.path.lstrip("/")
+        if path.startswith(f"{settings.minio_bucket}/"):
+            return path[len(settings.minio_bucket) + 1 :]
+        raise StorageValidationError(f"Cannot parse MinIO object key from URL: {url}")
+    return url[idx + len(prefix) :]
+
+
 def build_object_url(object_key: str) -> str:
     """Public-style URL stored in ``thread_messages.input_image_urls``."""
     base = settings.minio_endpoint.rstrip("/")
@@ -96,6 +117,31 @@ def _put_object(object_key: str, data: bytes, content_type: str) -> None:
         length=len(data),
         content_type=content_type,
     )
+
+
+def _copy_object(source_key: str, dest_key: str) -> None:
+    client = _get_client()
+    client.copy_object(
+        settings.minio_bucket,
+        dest_key,
+        CopySource(settings.minio_bucket, source_key),
+    )
+
+
+async def copy_thread_images_to_pipeline(
+    project_id: int,
+    pipeline_id: UUID,
+    image_urls: list[str],
+) -> list[str]:
+    """Copy message-scoped images to the pipeline prefix and return new URLs."""
+    copied_urls: list[str] = []
+    for url in image_urls:
+        source_key = object_key_from_url(url)
+        filename = os.path.basename(source_key)
+        dest_key = build_pipeline_object_key(project_id, pipeline_id, filename)
+        await asyncio.to_thread(_copy_object, source_key, dest_key)
+        copied_urls.append(build_object_url(dest_key))
+    return copied_urls
 
 
 async def upload_thread_image(

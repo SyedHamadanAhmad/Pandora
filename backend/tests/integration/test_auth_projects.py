@@ -96,7 +96,7 @@ async def test_register_login_project_thread_and_minio(api_client: AsyncClient) 
     assert history.status_code == 200
     messages = history.json()["messages"]
     assert len(messages) == 1
-    assert messages[0]["pipelineId"] is None
+    assert messages[0]["pipelineId"] is not None
     assert len(messages[0]["inputImageUrls"]) == 1
 
     components = await api_client.get(
@@ -118,7 +118,7 @@ async def test_register_login_project_thread_and_minio(api_client: AsyncClient) 
             select(ThreadMessage).where(ThreadMessage.id == message_id)
         )
         message = row.scalar_one()
-        assert message.pipeline_id is None
+        assert message.pipeline_id is not None
         assert message.input_image_urls
         object_key = _object_key_from_url(message.input_image_urls[0])
 

@@ -38,12 +38,16 @@ class SchemaSerializationTests(unittest.TestCase):
         self.assertIn("createdAt", payload)
         self.assertIn("updatedAt", payload)
 
-    def test_create_thread_response_no_pipeline_id(self) -> None:
+    def test_create_thread_response_includes_pipeline_fields(self) -> None:
+        pipeline_id = uuid4()
         payload = CreateThreadResponse(
             message_id=7,
             created_at=datetime(2026, 5, 17, 12, 0, tzinfo=timezone.utc),
+            pipeline_id=pipeline_id,
+            status=ProjectStatus.running,
         ).model_dump(mode="json", by_alias=True)
-        self.assertEqual(set(payload.keys()), {"messageId", "createdAt"})
+        self.assertEqual(payload["pipelineId"], str(pipeline_id))
+        self.assertEqual(payload["status"], "running")
 
     def test_thread_message_response_pipeline_id_nullable(self) -> None:
         pipeline_id = uuid4()

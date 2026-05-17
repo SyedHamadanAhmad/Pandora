@@ -2,7 +2,7 @@ from datetime import datetime
 from uuid import UUID
 
 from app.schemas.common import ApiModel, OrmResponseModel
-from pandora_shared.enums import MessageRole
+from pandora_shared.enums import MessageRole, ProjectStatus
 
 
 class ThreadMessageResponse(OrmResponseModel):
@@ -16,10 +16,10 @@ class ThreadMessageResponse(OrmResponseModel):
 
 
 class CreateThreadResponse(ApiModel):
-    """Phase 2: no pipelineId — assigned in Phase 3."""
-
     message_id: int
     created_at: datetime
+    pipeline_id: UUID | None = None
+    status: ProjectStatus | None = None
 
 
 class ThreadListResponse(ApiModel):

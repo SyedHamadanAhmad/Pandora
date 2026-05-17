@@ -8,6 +8,7 @@ from app import rabbitmq
 from app.database import async_session, engine
 from app.routers import auth_router, projects_router, thread_router
 from app.services.message_broker import MessageBroker
+from app.services.pipeline_state import recover_running_projects
 
 
 @asynccontextmanager
@@ -18,6 +19,7 @@ async def lifespan(app: FastAPI):
     app.state.rabbitmq_connection = connection
     app.state.rabbitmq_channel = channel
     app.state.message_broker = MessageBroker(channel)
+    await recover_running_projects()
     yield
     await connection.close()
     await engine.dispose()
