@@ -54,3 +54,11 @@ def build_idempotency_key(
 def parse_results_event(source: str) -> str:
     """Event name for a parser result (text | image | url)."""
     return f"pandora.parse.results:{source}"
+
+
+# Work vs result event names (queue routing uses pandora_shared.queues constants)
+PARSE_REQUEST_EVENT = "pandora.parse.request"
+BRIEF_REQUEST_EVENT = "pandora.brief.request"
+BRIEF_READY_EVENT = "pandora.brief.ready"
+SCHEMA_REQUEST_EVENT = "pandora.schema.request"
+SCHEMA_READY_EVENT = "pandora.schema.ready"

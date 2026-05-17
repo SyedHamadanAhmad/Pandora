@@ -13,10 +13,8 @@ from app.services import pipeline_state
 from app.services.message_broker import MessageBroker
 from app.services.storage_service import copy_thread_images_to_pipeline
 from pandora_shared.enums import ProjectStatus
-from pandora_shared.events import MessageEnvelope
+from pandora_shared.events import MessageEnvelope, PARSE_REQUEST_EVENT
 from pandora_shared.queues import PARSE_IMAGE, PARSE_TEXT, PARSE_URL
-
-PARSE_REQUEST_EVENT = "pandora.parse.request"
 
 
 @dataclass(frozen=True)

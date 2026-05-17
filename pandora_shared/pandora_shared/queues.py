@@ -6,8 +6,10 @@ PARSE_IMAGE = "pandora.parse.image"
 PARSE_URL = "pandora.parse.url"
 PARSE_RESULTS = "pandora.parse.results"
 
-# Brief and schema
+# Brief and schema (work / result split — same pattern as parse.text → parse.results)
+BRIEF_REQUEST = "pandora.brief.request"
 BRIEF_READY = "pandora.brief.ready"
+SCHEMA_REQUEST = "pandora.schema.request"
 SCHEMA_READY = "pandora.schema.ready"
 
 # Component generation and feedback
@@ -33,7 +35,9 @@ ALL_QUEUES: list[str] = [
     PARSE_IMAGE,
     PARSE_URL,
     PARSE_RESULTS,
+    BRIEF_REQUEST,
     BRIEF_READY,
+    SCHEMA_REQUEST,
     SCHEMA_READY,
     COMPONENT_GENERATE,
     COMPONENT_GENERATED,
