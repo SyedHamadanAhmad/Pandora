@@ -25,6 +25,7 @@ Open:
 - Frontend (prod `make up`): http://localhost:3000
 - RabbitMQ management: http://localhost:15672 (credentials from `.env`)
 - MinIO console: http://localhost:9001 (credentials from `.env`)
+- PostgreSQL (dev, GUI clients): `postgresql://pandora:pandora@localhost:5432/pandora`
 
 ## Makefile commands
 
