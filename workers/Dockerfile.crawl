@@ -7,10 +7,13 @@ RUN apt-get update && apt-get install -y \
     libnss3 libatk-bridge2.0-0 libdrm2 libxkbcommon0 libgbm1 libasound2 curl \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.crawl.txt .
+COPY pandora_shared /app/pandora_shared
+RUN pip install --no-cache-dir -e /app/pandora_shared
+
+COPY workers/requirements.crawl.txt .
 RUN pip install --no-cache-dir -r requirements.crawl.txt
 RUN playwright install chromium
 
-COPY src/ ./src/
+COPY workers/src/ ./src/
 
 CMD ["python", "-m", "src.run.parse_url_worker"]

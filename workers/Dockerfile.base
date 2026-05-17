@@ -7,7 +7,10 @@ RUN apt-get update && apt-get install -y \
     && npm install -g typescript eslint \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.base.txt .
+COPY pandora_shared /app/pandora_shared
+RUN pip install --no-cache-dir -e /app/pandora_shared
+
+COPY workers/requirements.base.txt .
 RUN pip install --no-cache-dir -r requirements.base.txt
 
-COPY src/ ./src/
+COPY workers/src/ ./src/

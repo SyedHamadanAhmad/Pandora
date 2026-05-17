@@ -42,11 +42,18 @@ Open:
 
 ```
 pandora/
-├── frontend/     # React + Vite + Sandpack
-├── backend/      # FastAPI — sole DB writer
-├── workers/      # Stateless RabbitMQ agent workers
+├── pandora_shared/   # Shared queues, enums, message envelopes (pip install -e)
+├── frontend/         # React + Vite + Sandpack
+├── backend/          # FastAPI — sole DB writer
+├── workers/          # Stateless RabbitMQ agent workers
 ├── docker-compose.yml
 └── docker-compose.dev.yml
+```
+
+Install `pandora_shared` locally (optional, for IDE support):
+
+```bash
+pip install -e ./pandora_shared
 ```
 
 ## Documentation

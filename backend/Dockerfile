@@ -6,10 +6,13 @@ RUN apt-get update && apt-get install -y \
     libpq-dev gcc curl \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
+COPY pandora_shared /app/pandora_shared
+RUN pip install --no-cache-dir -e /app/pandora_shared
+
+COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY . .
+COPY backend /app
 
 EXPOSE 8000
 
