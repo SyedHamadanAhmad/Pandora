@@ -3,6 +3,10 @@ services:
     ports:
       - "5432:5432"
 
+  backend-migrate:
+    volumes:
+      - ./backend/alembic:/app/alembic
+
   backend:
     ports:
       - "8000:8000"

@@ -11,6 +11,7 @@ from app.models.project import Project
 from app.models.thread_message import ThreadMessage
 from app.services import pipeline_state
 from app.services.message_broker import MessageBroker
+from app.services.pipeline_consumer import make_parses_complete_callback
 from app.services.storage_service import copy_thread_images_to_pipeline
 from pandora_shared.enums import ProjectStatus
 from pandora_shared.events import MessageEnvelope, PipelineEvent
@@ -49,7 +50,12 @@ async def trigger_pipeline_run(
     await db.refresh(message)
     await db.refresh(project)
 
-    pipeline_state.init_state_from_thread(project.id, pipeline_id, message)
+    pipeline_state.init_state_from_thread(
+        project.id,
+        pipeline_id,
+        message,
+        on_parses_complete=make_parses_complete_callback(broker),
+    )
     pipeline_state.schedule_parse_timeouts(pipeline_id)
 
     await _publish_parse_jobs(broker, project.id, pipeline_id, message)

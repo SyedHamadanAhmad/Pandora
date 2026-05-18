@@ -1,3 +1,4 @@
+import asyncio
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -7,6 +8,7 @@ from sqlalchemy import text
 from app import rabbitmq
 from app.database import async_session, engine
 from app.routers import auth_router, projects_router, thread_router
+from app.services import pipeline_consumer
 from app.services.message_broker import MessageBroker
 from app.services.pipeline_state import recover_running_projects
 
@@ -18,9 +20,25 @@ async def lifespan(app: FastAPI):
     await rabbitmq.declare_topology(channel)
     app.state.rabbitmq_connection = connection
     app.state.rabbitmq_channel = channel
-    app.state.message_broker = MessageBroker(channel)
+    broker = MessageBroker(channel)
+    app.state.message_broker = broker
+
     await recover_running_projects()
+    pipeline_consumer.wire_parses_complete_callbacks(broker)
+
+    consumer_task = asyncio.create_task(
+        pipeline_consumer.run_forever(connection, broker),
+        name="pipeline-consumer",
+    )
+    app.state.pipeline_consumer_task = consumer_task
+
     yield
+
+    consumer_task.cancel()
+    try:
+        await consumer_task
+    except asyncio.CancelledError:
+        pass
     await connection.close()
     await engine.dispose()
 
