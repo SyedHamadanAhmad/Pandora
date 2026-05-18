@@ -51,7 +51,7 @@ class MessageEnvelope(BaseModel):
     event: str
     project_id: int
     pipeline_id: UUID
-    component_id: UUID | None = None
+    component_id: int | None = None
     attempt: Attempt | None = None
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     payload: dict[str, Any] = Field(default_factory=dict)
@@ -61,7 +61,7 @@ def build_idempotency_key(
     pipeline_id: UUID,
     event: str,
     *,
-    component_id: UUID | None = None,
+    component_id: int | None = None,
     attempt: Attempt | None = None,
 ) -> str:
     """

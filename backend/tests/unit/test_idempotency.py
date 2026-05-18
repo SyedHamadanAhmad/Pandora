@@ -24,7 +24,7 @@ from pandora_shared.payloads import ParseResultPayload
 class IdempotencyKeyTests(unittest.TestCase):
     def test_key_for_envelope_with_component_attempt(self) -> None:
         pipeline_id = uuid4()
-        component_id = uuid4()
+        component_id = 42
         envelope = MessageEnvelope(
             event="pandora.component.validated",
             project_id=1,
