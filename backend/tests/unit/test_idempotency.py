@@ -12,7 +12,13 @@ from app.services.idempotency import (
     parse_results_idempotency_key,
     run_idempotent,
 )
-from pandora_shared.events import Attempt, MessageEnvelope, build_idempotency_key
+from pandora_shared.events import (
+    Attempt,
+    MessageEnvelope,
+    PipelineEvent,
+    build_idempotency_key,
+)
+from pandora_shared.payloads import ParseResultPayload
 
 
 class IdempotencyKeyTests(unittest.TestCase):
@@ -40,6 +46,17 @@ class IdempotencyKeyTests(unittest.TestCase):
     def test_parse_results_key_includes_source(self) -> None:
         pipeline_id = uuid4()
         key = parse_results_idempotency_key(pipeline_id, "text")
+        self.assertEqual(key, f"{pipeline_id}:pandora.parse.results:text")
+
+    def test_idempotency_key_for_parse_result_envelope(self) -> None:
+        pipeline_id = uuid4()
+        envelope = MessageEnvelope(
+            event=PipelineEvent.PARSE_RESULTS,
+            project_id=1,
+            pipeline_id=pipeline_id,
+            payload=ParseResultPayload(source="text", data={"x": 1}).model_dump(),
+        )
+        key = idempotency_key_for_envelope(envelope)
         self.assertEqual(key, f"{pipeline_id}:pandora.parse.results:text")
 
 

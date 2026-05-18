@@ -19,6 +19,7 @@ from app.models.design_schema import DesignSchema
 from app.models.project import Project
 from app.models.thread_message import ThreadMessage
 from pandora_shared.enums import ComponentStatus, ProjectStatus
+from pandora_shared.payloads import ParseResultPayload
 
 logger = logging.getLogger(__name__)
 
@@ -141,7 +142,7 @@ def record_parse_result(
 
 
 def synthetic_timeout_payload(source: ParseSource) -> dict[str, Any]:
-    return {"source": source, "error": "timeout", "data": None}
+    return ParseResultPayload(source=source, data=None, error="timeout").model_dump()
 
 
 async def apply_parse_timeout(pipeline_id: UUID, source: ParseSource) -> bool:

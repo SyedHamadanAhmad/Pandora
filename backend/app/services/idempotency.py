@@ -14,8 +14,10 @@ from app.models.processed_event import ProcessedEvent
 from pandora_shared.events import (
     Attempt,
     MessageEnvelope,
+    PipelineEvent,
     build_idempotency_key,
-    parse_results_event,
+    parse_results_idempotency_event,
+    parse_source_from_envelope,
 )
 
 T = TypeVar("T")
@@ -34,9 +36,13 @@ def idempotency_key_for_envelope(
     event: str | None = None,
 ) -> str:
     """Build an idempotency key from a message envelope."""
+    event_name = event or envelope.event
+    if event_name == PipelineEvent.PARSE_RESULTS:
+        source = parse_source_from_envelope(envelope)
+        return parse_results_idempotency_key(envelope.pipeline_id, source)
     return build_idempotency_key(
         envelope.pipeline_id,
-        event or envelope.event,
+        event_name,
         component_id=envelope.component_id,
         attempt=envelope.attempt,
     )
@@ -44,7 +50,7 @@ def idempotency_key_for_envelope(
 
 def parse_results_idempotency_key(pipeline_id: UUID, source: str) -> str:
     """Idempotency key for a single parser result (text | image | url)."""
-    return build_idempotency_key(pipeline_id, parse_results_event(source))
+    return build_idempotency_key(pipeline_id, parse_results_idempotency_event(source))
 
 
 async def run_idempotent(

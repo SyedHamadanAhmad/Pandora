@@ -13,7 +13,7 @@ from app.services import pipeline_state
 from app.services.message_broker import MessageBroker
 from app.services.storage_service import copy_thread_images_to_pipeline
 from pandora_shared.enums import ProjectStatus
-from pandora_shared.events import MessageEnvelope, PARSE_REQUEST_EVENT
+from pandora_shared.events import MessageEnvelope, PipelineEvent
 from pandora_shared.queues import PARSE_IMAGE, PARSE_TEXT, PARSE_URL
 
 
@@ -67,7 +67,7 @@ async def _publish_parse_jobs(
     for source in sources:
         queue_name, payload = _parse_job_for_source(source, message)
         envelope = MessageEnvelope(
-            event=PARSE_REQUEST_EVENT,
+            event=PipelineEvent.PARSE_REQUEST,
             project_id=project_id,
             pipeline_id=pipeline_id,
             payload=payload,

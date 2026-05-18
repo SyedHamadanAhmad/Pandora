@@ -5,10 +5,21 @@ from pandora_shared.events import (
     BRIEF_REQUEST_EVENT,
     MessageEnvelope,
     PARSE_REQUEST_EVENT,
+    PARSE_RESULTS_EVENT,
+    PipelineEvent,
     SCHEMA_READY_EVENT,
     SCHEMA_REQUEST_EVENT,
     build_idempotency_key,
-    parse_results_event,
+    parse_results_idempotency_event,
+    parse_source_from_envelope,
+)
+from pandora_shared.payloads import (
+    PARSE_SOURCES,
+    ParseImageWorkPayload,
+    ParseResultPayload,
+    ParseSource,
+    ParseTextWorkPayload,
+    ParseUrlWorkPayload,
 )
 from pandora_shared import queues
 
@@ -20,10 +31,19 @@ __all__ = [
     "MessageEnvelope",
     "MessageRole",
     "PARSE_REQUEST_EVENT",
+    "PARSE_RESULTS_EVENT",
+    "PARSE_SOURCES",
+    "ParseImageWorkPayload",
+    "ParseResultPayload",
+    "ParseSource",
+    "ParseTextWorkPayload",
+    "ParseUrlWorkPayload",
+    "PipelineEvent",
     "ProjectStatus",
     "SCHEMA_READY_EVENT",
     "SCHEMA_REQUEST_EVENT",
     "build_idempotency_key",
-    "parse_results_event",
+    "parse_results_idempotency_event",
+    "parse_source_from_envelope",
     "queues",
 ]

@@ -1,12 +1,41 @@
-"""RabbitMQ message envelope and idempotency helpers (Tech Spec v1.7 §3b, §7.5)."""
+"""RabbitMQ message envelope and idempotency helpers (Tech Spec §3b, §7.5)."""
 
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from enum import StrEnum
 from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, Field
+
+from pandora_shared.payloads import PARSE_SOURCES, ParseResultPayload, ParseSource
+
+_PARSE_RESULTS_PREFIX = "pandora.parse.results:"
+
+
+class PipelineEvent(StrEnum):
+    """Canonical ``MessageEnvelope.event`` values."""
+
+    PARSE_REQUEST = "pandora.parse.request"
+    PARSE_RESULTS = "pandora.parse.results"
+    BRIEF_REQUEST = "pandora.brief.request"
+    BRIEF_READY = "pandora.brief.ready"
+    SCHEMA_REQUEST = "pandora.schema.request"
+    SCHEMA_READY = "pandora.schema.ready"
+    COMPONENT_VALIDATED = "pandora.component.validated"
+    COMPONENT_FAILED = "pandora.component.failed"
+    VERIFICATION_COMPLETE = "pandora.verification.complete"
+    SHOWCASE_READY = "pandora.showcase.ready"
+
+
+# Backward-compatible aliases (prefer PipelineEvent in new code)
+PARSE_REQUEST_EVENT = PipelineEvent.PARSE_REQUEST
+PARSE_RESULTS_EVENT = PipelineEvent.PARSE_RESULTS
+BRIEF_REQUEST_EVENT = PipelineEvent.BRIEF_REQUEST
+BRIEF_READY_EVENT = PipelineEvent.BRIEF_READY
+SCHEMA_REQUEST_EVENT = PipelineEvent.SCHEMA_REQUEST
+SCHEMA_READY_EVENT = PipelineEvent.SCHEMA_READY
 
 
 class Attempt(BaseModel):
@@ -51,14 +80,15 @@ def build_idempotency_key(
     return key
 
 
-def parse_results_event(source: str) -> str:
-    """Event name for a parser result (text | image | url)."""
-    return f"pandora.parse.results:{source}"
+def parse_results_idempotency_event(source: str) -> str:
+    """Event segment for idempotency keys (includes parse source)."""
+    if source not in PARSE_SOURCES:
+        raise ValueError(f"Invalid parse source: {source}")
+    return f"{_PARSE_RESULTS_PREFIX}{source}"
 
 
-# Work vs result event names (queue routing uses pandora_shared.queues constants)
-PARSE_REQUEST_EVENT = "pandora.parse.request"
-BRIEF_REQUEST_EVENT = "pandora.brief.request"
-BRIEF_READY_EVENT = "pandora.brief.ready"
-SCHEMA_REQUEST_EVENT = "pandora.schema.request"
-SCHEMA_READY_EVENT = "pandora.schema.ready"
+def parse_source_from_envelope(envelope: MessageEnvelope) -> ParseSource:
+    """Resolve parse modality from ``event=pandora.parse.results`` and ``payload.source``."""
+    if envelope.event != PipelineEvent.PARSE_RESULTS:
+        raise ValueError(f"Expected event {PipelineEvent.PARSE_RESULTS}, got {envelope.event!r}")
+    return ParseResultPayload.model_validate(envelope.payload).source
