@@ -1,0 +1,60 @@
+# Stub workers for Phase 3 E2E (Step 7). Use: make dev-stub
+services:
+  stub-parse-text:
+    profiles: ["stub"]
+    build:
+      context: .
+      dockerfile: workers/stub/Dockerfile
+    env_file: .env
+    command: ["python", "-m", "pandora_stub.parse_worker", "text"]
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      backend:
+        condition: service_started
+    networks:
+      - pandora-net
+
+  stub-parse-image:
+    profiles: ["stub"]
+    build:
+      context: .
+      dockerfile: workers/stub/Dockerfile
+    env_file: .env
+    command: ["python", "-m", "pandora_stub.parse_worker", "image"]
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      backend:
+        condition: service_started
+    networks:
+      - pandora-net
+
+  stub-parse-url:
+    profiles: ["stub"]
+    build:
+      context: .
+      dockerfile: workers/stub/Dockerfile
+    env_file: .env
+    command: ["python", "-m", "pandora_stub.parse_worker", "url"]
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      backend:
+        condition: service_started
+    networks:
+      - pandora-net
+
+  stub-downstream:
+    profiles: ["stub"]
+    build:
+      context: .
+      dockerfile: workers/stub/Dockerfile
+    env_file: .env
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      backend:
+        condition: service_started
+    networks:
+      - pandora-net
