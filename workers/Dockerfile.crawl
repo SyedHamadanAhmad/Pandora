@@ -14,6 +14,11 @@ COPY workers/requirements.crawl.txt .
 RUN pip install --no-cache-dir -r requirements.crawl.txt
 RUN playwright install chromium
 
+COPY workers/requirements.base.txt .
+RUN pip install --no-cache-dir -r requirements.base.txt
+
 COPY workers/src/ ./src/
 
-CMD ["python", "-m", "src.run.parse_url_worker"]
+ENV PYTHONPATH=/app/src
+
+CMD ["python", "-m", "pandora_workers.run.parse_url"]

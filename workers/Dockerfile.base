@@ -14,3 +14,5 @@ COPY workers/requirements.base.txt .
 RUN pip install --no-cache-dir -r requirements.base.txt
 
 COPY workers/src/ ./src/
+
+ENV PYTHONPATH=/app/src

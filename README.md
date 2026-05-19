@@ -61,5 +61,6 @@ pip install -e ./pandora_shared
 
 - [Phase 0 walkthrough](docs/PHASE_0.md)
 - [Phase 1 implementation plan](docs/PHASE_1.md)
+- [Phases 4–7 — real agents](docs/PHASES_4_7_IMPLEMENTATION.md)
 - [Pandora_PRD.pdf](Pandora_PRD.pdf)
 - [Pandora_TechSpec_v1.7.pdf](Pandora_TechSpec_v1.7.pdf)

@@ -23,6 +23,7 @@ class PipelineEvent(StrEnum):
     BRIEF_READY = "pandora.brief.ready"
     SCHEMA_REQUEST = "pandora.schema.request"
     SCHEMA_READY = "pandora.schema.ready"
+    COMPONENT_GENERATED = "pandora.component.generated"
     COMPONENT_VALIDATED = "pandora.component.validated"
     COMPONENT_FAILED = "pandora.component.failed"
     VERIFICATION_COMPLETE = "pandora.verification.complete"

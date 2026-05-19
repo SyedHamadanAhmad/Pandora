@@ -1,0 +1,137 @@
+# Real agents (Phases 4–7). Use: make dev-agents
+# Entry modules live under workers/src/pandora_workers/run/
+services:
+  worker-parse-text:
+    profiles: ["agents"]
+    build:
+      context: .
+      dockerfile: workers/Dockerfile.base
+    command: ["python", "-m", "pandora_workers.run.parse_text"]
+    env_file: .env
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      backend:
+        condition: service_started
+    networks:
+      - pandora-net
+
+  worker-parse-image:
+    profiles: ["agents"]
+    build:
+      context: .
+      dockerfile: workers/Dockerfile.base
+    command: ["python", "-m", "pandora_workers.run.parse_image"]
+    env_file: .env
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      backend:
+        condition: service_started
+    networks:
+      - pandora-net
+
+  worker-parse-url:
+    profiles: ["agents"]
+    build:
+      context: .
+      dockerfile: workers/Dockerfile.crawl
+    command: ["python", "-m", "pandora_workers.run.parse_url"]
+    env_file: .env
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      backend:
+        condition: service_started
+    networks:
+      - pandora-net
+
+  worker-brief:
+    profiles: ["agents"]
+    build:
+      context: .
+      dockerfile: workers/Dockerfile.base
+    command: ["python", "-m", "pandora_workers.run.brief"]
+    env_file: .env
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      backend:
+        condition: service_started
+    networks:
+      - pandora-net
+
+  worker-schema:
+    profiles: ["agents"]
+    build:
+      context: .
+      dockerfile: workers/Dockerfile.base
+    command: ["python", "-m", "pandora_workers.run.schema"]
+    env_file: .env
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      backend:
+        condition: service_started
+    networks:
+      - pandora-net
+
+  worker-component-gen:
+    profiles: ["agents"]
+    build:
+      context: .
+      dockerfile: workers/Dockerfile.base
+    command: ["python", "-m", "pandora_workers.run.component_gen"]
+    env_file: .env
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      backend:
+        condition: service_started
+    networks:
+      - pandora-net
+
+  worker-feedback:
+    profiles: ["agents"]
+    build:
+      context: .
+      dockerfile: workers/Dockerfile.base
+    command: ["python", "-m", "pandora_workers.run.feedback"]
+    env_file: .env
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      backend:
+        condition: service_started
+    networks:
+      - pandora-net
+
+  worker-verification:
+    profiles: ["agents"]
+    build:
+      context: .
+      dockerfile: workers/Dockerfile.base
+    command: ["python", "-m", "pandora_workers.run.verification"]
+    env_file: .env
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      backend:
+        condition: service_started
+    networks:
+      - pandora-net
+
+  worker-showcase:
+    profiles: ["agents"]
+    build:
+      context: .
+      dockerfile: workers/Dockerfile.base
+    command: ["python", "-m", "pandora_workers.run.showcase"]
+    env_file: .env
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      backend:
+        condition: service_started
+    networks:
+      - pandora-net

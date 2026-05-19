@@ -1,8 +1,9 @@
 COMPOSE := docker compose
 COMPOSE_DEV := $(COMPOSE) -f docker-compose.yml -f docker-compose.dev.yml
 COMPOSE_STUB := $(COMPOSE_DEV) -f docker-compose.stub.yml --profile stub
+COMPOSE_AGENTS := $(COMPOSE_DEV) -f docker-compose.agents.yml --profile agents
 
-.PHONY: dev dev-stub up down logs migrate test test-integration phase2-gate shell scale-component check-env
+.PHONY: dev dev-stub dev-agents up down logs migrate test test-integration phase2-gate shell scale-component check-env
 
 check-env:
 	@test -f .env || (echo "Missing .env — run: cp .env.example .env" && exit 1)
@@ -12,6 +13,9 @@ dev: check-env
 
 dev-stub: check-env
 	$(COMPOSE_STUB) up --build
+
+dev-agents: check-env
+	$(COMPOSE_AGENTS) up --build
 
 up: check-env
 	$(COMPOSE) -f docker-compose.yml -f docker-compose.prod.yml up --build -d
