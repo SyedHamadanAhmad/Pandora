@@ -1,13 +1,7 @@
-"""ComponentGenAgent entry point — implemented in Phase 6.1."""
+"""ComponentGenAgent entry point — Phase 6.1."""
 
-from __future__ import annotations
-
-import sys
+from pandora_workers.agents.component_gen import ComponentGenAgent
+from pandora_workers.run._bootstrap import run_or_exit
 
 if __name__ == "__main__":
-    print(
-        "worker-component-gen: implement pandora_workers.agents.component_gen.ComponentGenAgent "
-        "(Phase 6.1)",
-        file=sys.stderr,
-    )
-    sys.exit(1)
+    run_or_exit(ComponentGenAgent, phase="Phase 6", step="6.1")

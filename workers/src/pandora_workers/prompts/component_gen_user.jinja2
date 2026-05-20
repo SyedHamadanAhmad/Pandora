@@ -1,0 +1,30 @@
+You are generating **one React component** for a design-system POC.
+
+## Component spec (JSON)
+
+{{ spec_json }}
+
+## Design tokens (JSON)
+
+{{ design_tokens_json }}
+
+## Global config (JSON)
+
+{{ global_config_json }}
+
+{% if revision_instruction %}
+## Revision instruction
+
+{{ revision_instruction }}
+{% endif %}
+
+---
+
+Return a **single JSON object** with **exactly** these keys:
+
+- `tsx_code` (string, required): A valid React 18 functional component in TypeScript. Export as `export function {{ component_name }}(...)`. Use only `react` import if needed. No external UI libraries. Use `className` for styling hooks matching CSS below.
+- `css_code` (string or null): Scoped CSS for this component (class names prefixed with `pandora-{{ component_name_lower }}` when possible).
+- `props` (object or null): Default prop values / prop schema hints.
+- `variants` (array of strings): Echo spec variants when present; otherwise `["default"]`.
+
+Keep the component small and self-contained. Do not include keys other than the four above.

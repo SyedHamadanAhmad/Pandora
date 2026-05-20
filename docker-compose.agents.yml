@@ -1,14 +1,18 @@
 # Real agents (Phases 4–7).
 # Phase 4 parse only: make dev-parse-agents
-# Full agents (when implemented): make dev-agents
+# Phase 6 E2E: make dev-phase6-e2e (default --scale 5 for worker-component-gen + worker-feedback)
 # Entry modules live under workers/src/pandora_workers/run/
 
 x-agent-volumes: &agent-volumes
   - ./workers/src:/app/src
   - ./pandora_shared:/app/pandora_shared
 
+x-agent-restart: &agent-restart
+  restart: unless-stopped
+
 services:
   worker-parse-text:
+    <<: *agent-restart
     profiles: ["agents", "agents-parse"]
     build:
       context: .
@@ -25,6 +29,7 @@ services:
       - pandora-net
 
   worker-parse-image:
+    <<: *agent-restart
     profiles: ["agents", "agents-parse"]
     build:
       context: .
@@ -41,6 +46,7 @@ services:
       - pandora-net
 
   worker-parse-url:
+    <<: *agent-restart
     profiles: ["agents", "agents-parse"]
     build:
       context: .
@@ -58,6 +64,7 @@ services:
       - pandora-net
 
   worker-brief:
+    <<: *agent-restart
     profiles: ["agents-downstream"]
     build:
       context: .
@@ -90,12 +97,14 @@ services:
       - pandora-net
 
   worker-component-gen:
+    <<: *agent-restart
     profiles: ["agents-downstream"]
     build:
       context: .
       dockerfile: workers/Dockerfile.base
     command: ["python", "-m", "pandora_workers.run.component_gen"]
     env_file: .env
+    volumes: *agent-volumes
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -105,12 +114,14 @@ services:
       - pandora-net
 
   worker-feedback:
+    <<: *agent-restart
     profiles: ["agents-downstream"]
     build:
       context: .
       dockerfile: workers/Dockerfile.base
     command: ["python", "-m", "pandora_workers.run.feedback"]
     env_file: .env
+    volumes: *agent-volumes
     depends_on:
       rabbitmq:
         condition: service_healthy

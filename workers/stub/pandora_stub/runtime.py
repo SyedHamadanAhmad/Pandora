@@ -25,8 +25,39 @@ def rabbitmq_url() -> str:
     return os.environ.get("RABBITMQ_URL", "amqp://pandora:pandora@rabbitmq:5672/")
 
 
-async def connect() -> AbstractRobustConnection:
-    return await aio_pika.connect_robust(rabbitmq_url())
+async def connect(
+    *,
+    max_attempts: int | None = None,
+    delay_seconds: float = 2.0,
+) -> AbstractRobustConnection:
+    """Connect to RabbitMQ with retries (compose may mark rabbitmq healthy before AMQP listens)."""
+    attempts = max_attempts
+    if attempts is None:
+        raw = os.environ.get("RABBITMQ_CONNECT_ATTEMPTS", "30").strip()
+        try:
+            attempts = max(1, int(raw))
+        except ValueError:
+            attempts = 30
+
+    url = rabbitmq_url()
+    last_error: BaseException | None = None
+    for attempt in range(1, attempts + 1):
+        try:
+            return await aio_pika.connect_robust(url)
+        except Exception as exc:
+            last_error = exc
+            logger.warning(
+                "RabbitMQ connect failed (%s/%s) url=%s: %s",
+                attempt,
+                attempts,
+                url.split("@")[-1] if "@" in url else url,
+                exc,
+            )
+            if attempt < attempts:
+                await asyncio.sleep(delay_seconds)
+
+    assert last_error is not None
+    raise last_error
 
 
 async def declare_topology(channel: aio_pika.abc.AbstractChannel) -> None:

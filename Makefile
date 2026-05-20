@@ -7,7 +7,11 @@ COMPOSE_BRIEF_E2E := $(COMPOSE_DEV) -f docker-compose.agents.yml \
 	--profile agents-parse --profile agents-downstream \
 	-f docker-compose.stub.yml --profile stub
 
-.PHONY: dev dev-stub dev-agents dev-parse-agents dev-parse-e2e dev-brief-e2e dev-phase5-e2e up down logs migrate test test-integration phase2-gate shell scale-component check-env test-parse-unit
+# Default parallelism for component.generate / component.generated consumers
+COMPONENT_GEN_SCALE ?= 5
+FEEDBACK_SCALE ?= 5
+
+.PHONY: dev dev-stub dev-agents dev-parse-agents dev-parse-e2e dev-brief-e2e dev-phase5-e2e dev-phase6-e2e down-phase6-e2e up down logs migrate test test-integration phase2-gate shell scale-component-gen scale-feedback check-env test-parse-unit test-phase6-unit
 
 check-env:
 	@test -f .env || (echo "Missing .env — run: cp .env.example .env" && exit 1)
@@ -33,6 +37,20 @@ dev-phase5-e2e: check-env
 	STUB_SKIP_BRIEF=1 STUB_SKIP_SCHEMA=1 $(COMPOSE_BRIEF_E2E) up --build \
 		worker-parse-text worker-parse-url worker-brief worker-schema stub-downstream
 
+# Tear down Phase 6 E2E stack (fixes stale Docker networks after Ctrl+C).
+down-phase6-e2e:
+	$(COMPOSE_BRIEF_E2E) down --remove-orphans
+
+# Real parse + brief + schema + component-gen + feedback; stub handles verify/showcase only.
+# Override scale: make dev-phase6-e2e COMPONENT_GEN_SCALE=3 FEEDBACK_SCALE=3
+dev-phase6-e2e: check-env down-phase6-e2e
+	STUB_SKIP_BRIEF=1 STUB_SKIP_SCHEMA=1 STUB_SKIP_COMPONENT=1 $(COMPOSE_BRIEF_E2E) up -d --build --wait postgres rabbitmq minio backend
+	STUB_SKIP_BRIEF=1 STUB_SKIP_SCHEMA=1 STUB_SKIP_COMPONENT=1 $(COMPOSE_BRIEF_E2E) up --build \
+		--scale worker-component-gen=$(COMPONENT_GEN_SCALE) \
+		--scale worker-feedback=$(FEEDBACK_SCALE) \
+		worker-parse-text worker-parse-url worker-brief worker-schema \
+		worker-component-gen worker-feedback stub-downstream
+
 # Alias: brief-only real agent (stub still handles schema unless you use dev-phase5-e2e).
 dev-brief-e2e: check-env
 	STUB_SKIP_BRIEF=1 $(COMPOSE_BRIEF_E2E) up --build \
@@ -43,6 +61,12 @@ test-parse-unit:
 	  backend.tests.unit.test_parse_agents \
 	  backend.tests.unit.test_brief_agent \
 	  backend.tests.unit.test_schema_agent \
+	  -v
+
+test-phase6-unit:
+	@PYTHONPATH=workers/src:pandora_shared python3.11 -m unittest \
+	  backend.tests.unit.test_component_gen_agent \
+	  backend.tests.unit.test_feedback_agent \
 	  -v
 
 up: check-env
@@ -76,9 +100,13 @@ phase2-gate: check-env
 test-e2e:
 	@echo "E2E tests — implemented in Phase 9 (requires DEEPSEEK_API_KEY)"
 
-scale-component:
-	@test -n "$(n)" || (echo "Usage: make scale-component n=5" && exit 1)
-	$(COMPOSE) up --scale worker-component=$(n) -d
+scale-component-gen:
+	@test -n "$(n)" || (echo "Usage: make scale-component-gen n=5" && exit 1)
+	$(COMPOSE_BRIEF_E2E) up --scale worker-component-gen=$(n) -d worker-component-gen
+
+scale-feedback:
+	@test -n "$(n)" || (echo "Usage: make scale-feedback n=5" && exit 1)
+	$(COMPOSE_BRIEF_E2E) up --scale worker-feedback=$(n) -d worker-feedback
 
 shell:
 	@test -n "$(s)" || (echo "Usage: make shell s=backend" && exit 1)

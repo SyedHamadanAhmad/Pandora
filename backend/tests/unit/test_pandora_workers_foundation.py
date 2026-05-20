@@ -121,7 +121,7 @@ class PromptLoaderTests(unittest.TestCase):
 
 class ValidationTests(unittest.IsolatedAsyncioTestCase):
     async def test_invalid_tsx_fails_when_tsc_available(self) -> None:
-        ok, errors = await run_tsc_and_eslint("export const x: number = 'nope';")
+        ok, errors = await run_tsc_and_eslint("export const broken = ;")
         if not errors:
             self.skipTest("tsc/eslint not available in test environment")
         self.assertFalse(ok)

@@ -1,13 +1,7 @@
-"""FeedbackAgent entry point — implemented in Phase 6.2."""
+"""FeedbackAgent entry point — Phase 6.2."""
 
-from __future__ import annotations
-
-import sys
+from pandora_workers.agents.feedback import FeedbackAgent
+from pandora_workers.run._bootstrap import run_or_exit
 
 if __name__ == "__main__":
-    print(
-        "worker-feedback: implement pandora_workers.agents.feedback.FeedbackAgent "
-        "(Phase 6.2)",
-        file=sys.stderr,
-    )
-    sys.exit(1)
+    run_or_exit(FeedbackAgent, phase="Phase 6", step="6.2")
