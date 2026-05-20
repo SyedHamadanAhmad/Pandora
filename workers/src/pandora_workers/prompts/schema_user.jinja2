@@ -1,0 +1,21 @@
+You are producing a **design schema** (tokens + component specs) for a React design-system generator.
+
+## Brief context (JSON)
+
+{{ brief_json }}
+
+---
+
+Return a **single JSON object** with **exactly** these keys:
+
+- `design_tokens` (object): merge `color_tokens` from the brief with useful UI tokens (e.g. `primary`, `radius`, `fontFamily`, `spacingScale`). Prefer hex colors from the brief when present.
+- `global_config` (object): e.g. `{"theme": "light"|"dark", "design_flavour": "<echo brief>"}` and any layout defaults.
+- `component_specs` (array, **at most 15** entries): one object per component name from `component_list` (in that order when possible). Each object must have:
+  - `name` (string, required): PascalCase component name (e.g. `Button`, `Hero`).
+  - `type` (string): semantic type e.g. `button`, `card`, `input`, `navigation`, `layout`.
+  - `variants` (array of strings): at least `["default"]`; add `primary`, `secondary`, etc. when relevant (max 8 variants per component).
+  - `layout` (string or null): short hint e.g. `horizontal`, `vertical`, `grid`.
+
+If `component_list` is empty, emit **one** minimal spec: `{"name": "Button", "type": "button", "variants": ["primary"], "layout": null}`.
+
+Do not include keys other than the three above.

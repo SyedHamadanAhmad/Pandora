@@ -8,6 +8,7 @@ from pandora_shared.payloads import (
     BriefReadyPayload,
     ParseResultPayload,
     SchemaReadyPayload,
+    SchemaRequestWorkPayload,
 )
 
 
@@ -34,6 +35,20 @@ class ParseResultPayloadTests(unittest.TestCase):
             component_specs=[{"name": "Button", "type": "button"}],
         )
         self.assertEqual(len(payload.component_specs), 1)
+
+
+class SchemaRequestWorkPayloadTests(unittest.TestCase):
+    def test_accepts_brief_extras_and_null_component_list(self) -> None:
+        p = SchemaRequestWorkPayload.model_validate(
+            {
+                "design_flavour": "x",
+                "component_list": None,
+                "color_tokens": {"primary": "#000"},
+                "tone": "friendly",
+            }
+        )
+        self.assertEqual(p.component_list, [])
+        self.assertEqual(p.model_dump().get("color_tokens"), {"primary": "#000"})
 
 
 if __name__ == "__main__":

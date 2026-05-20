@@ -64,11 +64,22 @@ class ComponentSpecPayload(BaseModel):
 
 
 class SchemaRequestWorkPayload(BaseModel):
-    """Work on ``pandora.schema.request``."""
+    """Work on ``pandora.schema.request`` (consumer sends the brief-ready body)."""
+
+    model_config = {"extra": "allow"}
 
     brief_id: int | None = None
     design_flavour: str | None = None
     component_list: list[str] = Field(default_factory=list)
+
+    @field_validator("component_list", mode="before")
+    @classmethod
+    def coalesce_component_list(cls, v: Any) -> list[str]:
+        if v is None:
+            return []
+        if not isinstance(v, list):
+            return []
+        return [str(x).strip() for x in v if str(x).strip()]
 
 
 class SchemaReadyPayload(BaseModel):

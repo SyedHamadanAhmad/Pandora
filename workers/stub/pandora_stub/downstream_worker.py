@@ -188,9 +188,12 @@ async def main() -> None:
         bindings.append((BRIEF_REQUEST, _handle_brief_request))
     else:
         logger.info("STUB_SKIP_BRIEF set — not consuming pandora.brief.request (use worker-brief)")
+    if not _truthy_env("STUB_SKIP_SCHEMA"):
+        bindings.append((SCHEMA_REQUEST, _handle_schema_request))
+    else:
+        logger.info("STUB_SKIP_SCHEMA set — not consuming pandora.schema.request (use worker-schema)")
     bindings.extend(
         [
-            (SCHEMA_REQUEST, _handle_schema_request),
             (COMPONENT_GENERATE, _handle_component_generate),
             (VERIFICATION_START, _handle_verification_start),
             (SHOWCASE_GENERATE, _handle_showcase_generate),
