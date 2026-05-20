@@ -1,9 +1,10 @@
 COMPOSE := docker compose
 COMPOSE_DEV := $(COMPOSE) -f docker-compose.yml -f docker-compose.dev.yml
 COMPOSE_STUB := $(COMPOSE_DEV) -f docker-compose.stub.yml --profile stub
-COMPOSE_AGENTS := $(COMPOSE_DEV) -f docker-compose.agents.yml --profile agents
+COMPOSE_AGENTS_PARSE := $(COMPOSE_DEV) -f docker-compose.agents.yml --profile agents-parse
+COMPOSE_PARSE_E2E := $(COMPOSE_AGENTS_PARSE) -f docker-compose.stub.yml --profile stub
 
-.PHONY: dev dev-stub dev-agents up down logs migrate test test-integration phase2-gate shell scale-component check-env
+.PHONY: dev dev-stub dev-agents dev-parse-agents dev-parse-e2e up down logs migrate test test-integration phase2-gate shell scale-component check-env test-parse-unit
 
 check-env:
 	@test -f .env || (echo "Missing .env — run: cp .env.example .env" && exit 1)
@@ -14,8 +15,17 @@ dev: check-env
 dev-stub: check-env
 	$(COMPOSE_STUB) up --build
 
-dev-agents: check-env
-	$(COMPOSE_AGENTS) up --build
+dev-parse-agents: check-env
+	$(COMPOSE_AGENTS_PARSE) up --build
+
+dev-agents: dev-parse-agents
+
+# Parse agents + stub downstream (brief/schema) — do not run stub-parse-* with real parse workers
+dev-parse-e2e: check-env
+	$(COMPOSE_PARSE_E2E) up --build worker-parse-text worker-parse-image worker-parse-url stub-downstream
+
+test-parse-unit:
+	@PYTHONPATH=workers/src python3.11 -m unittest backend.tests.unit.test_parse_agents -v
 
 up: check-env
 	$(COMPOSE) -f docker-compose.yml -f docker-compose.prod.yml up --build -d

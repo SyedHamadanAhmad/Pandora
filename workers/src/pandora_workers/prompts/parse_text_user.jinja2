@@ -1,0 +1,11 @@
+Extract design-relevant structure from this user message for a design-system brief.
+
+User message:
+{{ content }}
+
+Return a JSON object with exactly these keys:
+- "summary": string (2-4 sentences)
+- "keywords": array of strings (5-12 items)
+- "content": string (echo the original user message)
+- "tone_hints": string or null (e.g. professional, playful)
+- "requirements": array of strings (explicit UI/product asks, may be empty)

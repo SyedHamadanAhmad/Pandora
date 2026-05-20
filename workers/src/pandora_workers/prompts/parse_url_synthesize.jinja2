@@ -1,0 +1,10 @@
+Merge these per-URL parse results into one design-system brief input.
+
+Requirements:
+- Write a single coherent summary (do not concatenate page summaries with "|").
+- Merge keywords, fonts, colors, and component_candidates; remove duplicates and generic CSS fallbacks.
+- Resolve conflicts briefly in summary if sites disagree (e.g. different palettes).
+- Output JSON only with keys: summary, keywords, fonts, colors, component_candidates, layout_hints, tone_hints
+
+Per-URL parse results (JSON):
+{{ pages_json }}

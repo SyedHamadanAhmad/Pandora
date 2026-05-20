@@ -1,13 +1,7 @@
-"""UrlParserAgent entry point — implemented in Phase 4.3."""
+"""UrlParserAgent entry point."""
 
-from __future__ import annotations
-
-import sys
+from pandora_workers.agents.parse_url import ParseUrlAgent
+from pandora_workers.run._bootstrap import run_or_exit
 
 if __name__ == "__main__":
-    print(
-        "worker-parse-url: implement pandora_workers.agents.parse_url.ParseUrlAgent "
-        "(Phase 4.3)",
-        file=sys.stderr,
-    )
-    sys.exit(1)
+    run_or_exit(ParseUrlAgent, phase="Phase 4", step="4.3")

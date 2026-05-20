@@ -1,13 +1,21 @@
-# Real agents (Phases 4–7). Use: make dev-agents
+# Real agents (Phases 4–7).
+# Phase 4 parse only: make dev-parse-agents
+# Full agents (when implemented): make dev-agents
 # Entry modules live under workers/src/pandora_workers/run/
+
+x-agent-volumes: &agent-volumes
+  - ./workers/src:/app/src
+  - ./pandora_shared:/app/pandora_shared
+
 services:
   worker-parse-text:
-    profiles: ["agents"]
+    profiles: ["agents", "agents-parse"]
     build:
       context: .
       dockerfile: workers/Dockerfile.base
     command: ["python", "-m", "pandora_workers.run.parse_text"]
     env_file: .env
+    volumes: *agent-volumes
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -17,12 +25,13 @@ services:
       - pandora-net
 
   worker-parse-image:
-    profiles: ["agents"]
+    profiles: ["agents", "agents-parse"]
     build:
       context: .
       dockerfile: workers/Dockerfile.base
     command: ["python", "-m", "pandora_workers.run.parse_image"]
     env_file: .env
+    volumes: *agent-volumes
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -32,12 +41,14 @@ services:
       - pandora-net
 
   worker-parse-url:
-    profiles: ["agents"]
+    profiles: ["agents", "agents-parse"]
     build:
       context: .
       dockerfile: workers/Dockerfile.crawl
     command: ["python", "-m", "pandora_workers.run.parse_url"]
     env_file: .env
+    shm_size: "2gb"
+    volumes: *agent-volumes
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -47,7 +58,7 @@ services:
       - pandora-net
 
   worker-brief:
-    profiles: ["agents"]
+    profiles: ["agents-downstream"]
     build:
       context: .
       dockerfile: workers/Dockerfile.base
@@ -62,7 +73,7 @@ services:
       - pandora-net
 
   worker-schema:
-    profiles: ["agents"]
+    profiles: ["agents-downstream"]
     build:
       context: .
       dockerfile: workers/Dockerfile.base
@@ -77,7 +88,7 @@ services:
       - pandora-net
 
   worker-component-gen:
-    profiles: ["agents"]
+    profiles: ["agents-downstream"]
     build:
       context: .
       dockerfile: workers/Dockerfile.base
@@ -92,7 +103,7 @@ services:
       - pandora-net
 
   worker-feedback:
-    profiles: ["agents"]
+    profiles: ["agents-downstream"]
     build:
       context: .
       dockerfile: workers/Dockerfile.base
@@ -107,7 +118,7 @@ services:
       - pandora-net
 
   worker-verification:
-    profiles: ["agents"]
+    profiles: ["agents-downstream"]
     build:
       context: .
       dockerfile: workers/Dockerfile.base
@@ -122,7 +133,7 @@ services:
       - pandora-net
 
   worker-showcase:
-    profiles: ["agents"]
+    profiles: ["agents-downstream"]
     build:
       context: .
       dockerfile: workers/Dockerfile.base

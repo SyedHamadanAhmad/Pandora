@@ -1,0 +1,23 @@
+Summarize this crawled web page for a design-system generator brief.
+
+URL: {{ url }}
+{% if title %}Page title: {{ title }}
+{% endif %}
+{% if extracted_colors %}Colors detected in page HTML/CSS: {{ extracted_colors | join(", ") }}
+{% endif %}
+{% if extracted_fonts %}Fonts detected in page HTML/CSS: {{ extracted_fonts | join(", ") }}
+{% endif %}
+{% if component_candidates %}UI patterns detected: {{ component_candidates | join(", ") }}
+{% endif %}
+Page content (markdown, truncated):
+{{ markdown }}
+
+Return a JSON object with exactly these keys:
+- "summary": string (2-4 sentences on visual/design intent)
+- "keywords": array of strings (themes, patterns, industry)
+- "urls": array containing this URL string
+- "fonts": array of font family names (merge detected fonts with any you infer from content; use [] only if truly unknown)
+- "colors": array of hex or css color strings (merge detected colors with brand colors you infer; prefer #hex when possible)
+- "component_candidates": array of UI component names suggested by the page (e.g. Button, Card, Navigation, Hero, Footer)
+- "layout_hints": string (layout/navigation patterns observed)
+- "tone_hints": string or null

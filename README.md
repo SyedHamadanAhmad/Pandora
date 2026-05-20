@@ -38,6 +38,9 @@ Open:
 | `make logs` | Tail all service logs |
 | `make shell s=backend` | Shell into a running container |
 | `make scale-component n=5` | Scale component generation workers |
+| `make dev-parse-agents` | Phase 4 parse workers (text, image, url) |
+| `make dev-parse-e2e` | Parse agents + stub downstream (brief/schema) |
+| `make test-parse-unit` | Unit tests for parse agents |
 
 ## Project layout
 
@@ -62,5 +65,7 @@ pip install -e ./pandora_shared
 - [Phase 0 walkthrough](docs/PHASE_0.md)
 - [Phase 1 implementation plan](docs/PHASE_1.md)
 - [Phases 4–7 — real agents](docs/PHASES_4_7_IMPLEMENTATION.md)
+- [Phase 4 — implementation reference](docs/PHASE_4_IMPLEMENTATION.md)
+- [Phase 4 — testing parse agents (URL focus)](docs/PHASE_4_TESTING.md)
 - [Pandora_PRD.pdf](Pandora_PRD.pdf)
 - [Pandora_TechSpec_v1.7.pdf](Pandora_TechSpec_v1.7.pdf)

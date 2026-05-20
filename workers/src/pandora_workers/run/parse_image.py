@@ -1,13 +1,7 @@
-"""ImageParserAgent entry point — implemented in Phase 4.2."""
+"""ImageParserAgent entry point."""
 
-from __future__ import annotations
-
-import sys
+from pandora_workers.agents.parse_image import ParseImageAgent
+from pandora_workers.run._bootstrap import run_or_exit
 
 if __name__ == "__main__":
-    print(
-        "worker-parse-image: implement pandora_workers.agents.parse_image.ParseImageAgent "
-        "(Phase 4.2)",
-        file=sys.stderr,
-    )
-    sys.exit(1)
+    run_or_exit(ParseImageAgent, phase="Phase 4", step="4.2")
