@@ -38,8 +38,36 @@ class PipelineStateTests(unittest.TestCase):
         self.assertEqual(state.parse_expected, 2)
         self.assertEqual(state.parse_pending, {"text", "url"})
         self.assertEqual(state.parse_received, 0)
+        self.assertEqual(state.url_count, 1)
 
-    def test_record_parse_result_completes_when_all_in(self) -> None:
+    def test_url_parse_timeout_delay_scales_with_multiple_urls(self) -> None:
+        pipeline_id = uuid4()
+        message = ThreadMessage(
+            project_id=1,
+            user_id=1,
+            role=MessageRole.user,
+            content="hello",
+            input_urls=["https://a.example", "https://b.example"],
+        )
+        pipeline_state.init_state_from_thread(1, pipeline_id, message)
+        delay = pipeline_state._parse_timeout_delay_seconds(pipeline_id, "url")
+        # max(150, 120 + 100*2 + 90) == 410
+        self.assertEqual(delay, 410.0)
+
+    def test_text_parse_timeout_uses_flat_constant(self) -> None:
+        pipeline_id = uuid4()
+        message = ThreadMessage(
+            project_id=1,
+            user_id=1,
+            role=MessageRole.user,
+            content="hello",
+            input_urls=["https://a.example", "https://b.example"],
+        )
+        pipeline_state.init_state_from_thread(1, pipeline_id, message)
+        with patch.object(pipeline_state, "PARSE_TIMEOUT_SECONDS", 99):
+            self.assertEqual(
+                pipeline_state._parse_timeout_delay_seconds(pipeline_id, "text"), 99.0
+            )
         pipeline_id = uuid4()
         message = ThreadMessage(
             project_id=1,

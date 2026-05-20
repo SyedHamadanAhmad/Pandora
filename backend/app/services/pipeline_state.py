@@ -23,7 +23,14 @@ from pandora_shared.payloads import ParseResultPayload
 
 logger = logging.getLogger(__name__)
 
-PARSE_TIMEOUT_SECONDS = 60
+# Default watchdog for text/image (seconds).
+PARSE_TIMEOUT_SECONDS = 150
+
+# URL parse often exceeds a flat ceiling: crawl + one LLM per URL + optional multi-URL synthesis
+# in ``ParseUrlAgent`` — see ``_parse_timeout_watch`` / ``_parse_timeout_delay``.
+PARSE_URL_TIMEOUT_FLOOR = 120
+PARSE_URL_TIMEOUT_PER_URL = 100
+PARSE_URL_TIMEOUT_SYNTHESIS = 90
 
 ParseSource = str  # "text" | "image" | "url"
 
@@ -40,6 +47,8 @@ class PipelineStateNotFoundError(KeyError):
 class PipelineState:
     project_id: int
     pipeline_id: UUID
+    # len(thread URLs); scales URL parse watchdog (crawl + LLM per URL + synthesis).
+    url_count: int = 0
     expected_components: int = 0
     resolved_components: int = 0
     parse_results: dict[str, dict[str, Any]] = field(default_factory=dict)
@@ -97,9 +106,11 @@ def init_state_from_thread(
     (including synthetic timeout results). Wired by the pipeline consumer in Step 5.
     """
     sources = modalities_from_message(message)
+    url_count = len(message.input_urls or [])
     state = PipelineState(
         project_id=project_id,
         pipeline_id=pipeline_id,
+        url_count=url_count,
         parse_expected=len(sources),
         parse_pending=set(sources),
         _on_parses_complete=on_parses_complete,
@@ -109,7 +120,7 @@ def init_state_from_thread(
 
 
 def schedule_parse_timeouts(pipeline_id: UUID) -> None:
-    """Start 60s watchdog tasks for each pending parse source (requires running event loop)."""
+    """Start per-source parse watchdog tasks (requires running event loop)."""
     state = get_state(pipeline_id)
     for source in list(state.parse_pending):
         task = asyncio.create_task(
@@ -157,9 +168,23 @@ async def apply_parse_timeout(pipeline_id: UUID, source: ParseSource) -> bool:
     return complete
 
 
+def _parse_timeout_delay_seconds(pipeline_id: UUID, source: ParseSource) -> float:
+    """Wall-clock budget before synthetic timeout for this modality."""
+    if source != "url":
+        return float(PARSE_TIMEOUT_SECONDS)
+    state = get_state(pipeline_id)
+    n = max(1, state.url_count)
+    # One crawl+LLM budget per URL; extra pass when multi-URL rollup synthesizes.
+    url_budget = float(PARSE_URL_TIMEOUT_FLOOR + PARSE_URL_TIMEOUT_PER_URL * n)
+    if n > 1:
+        url_budget += float(PARSE_URL_TIMEOUT_SYNTHESIS)
+    return max(float(PARSE_TIMEOUT_SECONDS), url_budget)
+
+
 async def _parse_timeout_watch(pipeline_id: UUID, source: ParseSource) -> None:
     try:
-        await asyncio.sleep(PARSE_TIMEOUT_SECONDS)
+        delay = _parse_timeout_delay_seconds(pipeline_id, source)
+        await asyncio.sleep(delay)
         await apply_parse_timeout(pipeline_id, source)
     except asyncio.CancelledError:
         raise
@@ -204,9 +229,11 @@ async def _recover_project(db: AsyncSession, project: Project) -> None:
         return
 
     sources = modalities_from_message(message)
+    url_count = len(message.input_urls or [])
     state = PipelineState(
         project_id=project.id,
         pipeline_id=pipeline_id,
+        url_count=url_count,
         parse_expected=len(sources),
     )
 
