@@ -1,13 +1,7 @@
-"""ShowcaseAgent entry point — implemented in Phase 7.2."""
+"""ShowcaseAgent entry point — Phase 7.2."""
 
-from __future__ import annotations
-
-import sys
+from pandora_workers.agents.showcase import ShowcaseAgent
+from pandora_workers.run._bootstrap import run_or_exit
 
 if __name__ == "__main__":
-    print(
-        "worker-showcase: implement pandora_workers.agents.showcase.ShowcaseAgent "
-        "(Phase 7.2)",
-        file=sys.stderr,
-    )
-    sys.exit(1)
+    run_or_exit(ShowcaseAgent, phase="Phase 7", step="7.2")

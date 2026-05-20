@@ -1,0 +1,28 @@
+You are building a **motion showcase** that composes validated React components into 1–3 demo scenes.
+
+## Design tokens (JSON)
+
+{{ design_tokens_json }}
+
+## Global config (JSON)
+
+{{ global_config_json }}
+
+## Validated components (JSON)
+
+Each entry has `name`, `tsx_code`, and optional `css_code`. Reference these components in scene layout (import or inline composition as appropriate).
+
+{{ components_json }}
+
+---
+
+Return a **single JSON object** with one key:
+
+- `scenes` (array, 1–3 items): each object must have:
+  - `scene_index` (integer, 0-based order)
+  - `scene_name` (string): short title e.g. "Hero", "Components"
+  - `scene_tsx_code` (string): React TSX using motion-friendly markup (e.g. `motion.div` class names are fine; keep self-contained)
+  - `scene_css_code` (string or null): scene-level CSS
+  - `components_used` (array of strings): component **names** featured in the scene
+
+Keep scenes concise and demonstrative. Do not include keys other than `scenes`.

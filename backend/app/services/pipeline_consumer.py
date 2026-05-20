@@ -59,7 +59,6 @@ from pandora_shared.queues import (
     SHOWCASE_GENERATE,
     SHOWCASE_READY,
     VERIFICATION_COMPLETE,
-    VERIFICATION_REVISIONS,
     VERIFICATION_START,
 )
 
@@ -69,7 +68,6 @@ PREFETCH_COUNT = 10
 MAX_REVISION_ROUNDS = 2
 
 VERIFICATION_START_EVENT = "pandora.verification.start"
-VERIFICATION_REVISIONS_EVENT = "pandora.verification.revisions"
 COMPONENT_GENERATE_EVENT = "pandora.component.generate"
 SHOWCASE_GENERATE_EVENT = "pandora.showcase.generate"
 
@@ -397,41 +395,59 @@ async def _handle_verification_complete(
             await message.ack()
             return
 
-        get_state(envelope.pipeline_id)
-        key = idempotency_key_for_envelope(envelope)
-
-        async with async_session() as db:
-            status, _ = await run_idempotent(
-                db,
-                idempotency_key=key,
-                project_id=envelope.project_id,
-                handler=lambda session: _apply_verification_revisions(session, envelope),
-            )
-
-        if status == IdempotencyStatus.DUPLICATE:
-            await message.ack()
-            return
-
         state = get_state(envelope.pipeline_id)
+        key = idempotency_key_for_envelope(envelope)
         payload = envelope.payload
         issues = payload.get("issues") or []
         has_blocking = any(issue.get("priority") in ("P1", "P2") for issue in issues)
 
         if has_blocking and state.revision_round < MAX_REVISION_ROUNDS:
+            async with async_session() as db:
+                status, _ = await run_idempotent(
+                    db,
+                    idempotency_key=key,
+                    project_id=envelope.project_id,
+                    handler=lambda session: _apply_verification_revisions(session, envelope),
+                )
+            if status == IdempotencyStatus.DUPLICATE:
+                await message.ack()
+                return
+
             state.revision_round += 1
-            revision_envelope = MessageEnvelope(
-                event=VERIFICATION_REVISIONS_EVENT,
-                project_id=state.project_id,
-                pipeline_id=state.pipeline_id,
-                payload=payload,
+            async with async_session() as db:
+                await _fanout_revision_generates(db, envelope, state, broker)
+                await db.commit()
+            lock = _pipeline_locks.setdefault(state.pipeline_id, asyncio.Lock())
+            async with lock:
+                state.resolved_components = 0
+            _emit_project_event(
+                envelope.project_id,
+                {
+                    "type": "revision_running",
+                    "projectId": envelope.project_id,
+                    "pipelineId": str(envelope.pipeline_id),
+                    "revisionRound": state.revision_round,
+                },
             )
-            await broker.publish(VERIFICATION_REVISIONS, revision_envelope)
         else:
+            async with async_session() as db:
+                status, _ = await run_idempotent(
+                    db,
+                    idempotency_key=key,
+                    project_id=envelope.project_id,
+                    handler=_noop_handler,
+                )
+            if status == IdempotencyStatus.DUPLICATE:
+                await message.ack()
+                return
+
+            async with async_session() as db:
+                showcase_payload = await _build_showcase_work_payload(db, envelope.project_id)
             showcase_envelope = MessageEnvelope(
                 event=SHOWCASE_GENERATE_EVENT,
                 project_id=state.project_id,
                 pipeline_id=state.pipeline_id,
-                payload=payload,
+                payload=showcase_payload,
             )
             await broker.publish(SHOWCASE_GENERATE, showcase_envelope)
             _emit_project_event(
@@ -545,6 +561,7 @@ async def _ensure_verification_if_gate_open(
 async def _start_verification(state: PipelineState, broker: MessageBroker) -> None:
     """Slice E — publish verification work once all components are resolved."""
     key = build_idempotency_key(state.pipeline_id, VERIFICATION_START_EVENT)
+    work_payload: dict[str, Any] = {}
     async with async_session() as db:
         status, _ = await run_idempotent(
             db,
@@ -552,6 +569,8 @@ async def _start_verification(state: PipelineState, broker: MessageBroker) -> No
             project_id=state.project_id,
             handler=_noop_handler,
         )
+        if status != IdempotencyStatus.DUPLICATE:
+            work_payload = await _build_verification_work_payload(db, state.project_id)
 
     if status == IdempotencyStatus.DUPLICATE:
         return
@@ -560,7 +579,7 @@ async def _start_verification(state: PipelineState, broker: MessageBroker) -> No
         event=VERIFICATION_START_EVENT,
         project_id=state.project_id,
         pipeline_id=state.pipeline_id,
-        payload={},
+        payload=work_payload,
     )
     await broker.publish(VERIFICATION_START, envelope)
     _emit_project_event(
@@ -725,24 +744,194 @@ async def _apply_component_outcome(
     return component.name
 
 
+def _truncate_text(value: str | None, *, limit: int) -> str | None:
+    if value is None:
+        return None
+    text = value.strip()
+    if not text:
+        return None
+    if len(text) <= limit:
+        return text
+    return text[:limit] + "…[truncated]"
+
+
+async def _latest_schema_for_project(
+    session: AsyncSession,
+    project_id: int,
+) -> DesignSchema | None:
+    return await session.scalar(
+        select(DesignSchema)
+        .where(DesignSchema.project_id == project_id)
+        .order_by(DesignSchema.id.desc())
+        .limit(1)
+    )
+
+
+def _spec_for_component(schema: DesignSchema | None, spec_index: int) -> dict[str, Any]:
+    if schema is None or not schema.component_specs:
+        return {}
+    specs = schema.component_specs
+    if 0 <= spec_index < len(specs) and isinstance(specs[spec_index], dict):
+        return dict(specs[spec_index])
+    return {}
+
+
+async def _build_verification_work_payload(
+    session: AsyncSession,
+    project_id: int,
+) -> dict[str, Any]:
+    schema = await _latest_schema_for_project(session, project_id)
+    result = await session.execute(
+        select(Component)
+        .where(Component.project_id == project_id)
+        .order_by(Component.spec_index.asc())
+    )
+    components = result.scalars().all()
+    summaries: list[dict[str, Any]] = []
+    for component in components:
+        summaries.append(
+            {
+                "id": component.id,
+                "name": component.name,
+                "status": component.status.value,
+                "spec": _spec_for_component(schema, component.spec_index),
+                "tsx_preview": _truncate_text(component.tsx_code, limit=2000),
+                "css_preview": _truncate_text(component.css_code, limit=1000),
+                "error_reason": component.error_reason,
+            }
+        )
+    return {
+        "design_tokens": schema.design_tokens if schema else {},
+        "global_config": schema.global_config if schema else {},
+        "components": summaries,
+    }
+
+
+async def _build_showcase_work_payload(
+    session: AsyncSession,
+    project_id: int,
+) -> dict[str, Any]:
+    schema = await _latest_schema_for_project(session, project_id)
+    result = await session.execute(
+        select(Component)
+        .where(
+            Component.project_id == project_id,
+            Component.status == ComponentStatus.validated,
+        )
+        .order_by(Component.spec_index.asc())
+    )
+    components = result.scalars().all()
+    library: list[dict[str, Any]] = []
+    for component in components:
+        library.append(
+            {
+                "id": component.id,
+                "name": component.name,
+                "tsx_code": _truncate_text(component.tsx_code, limit=4000),
+                "css_code": _truncate_text(component.css_code, limit=2000),
+                "variants": component.variants,
+            }
+        )
+    return {
+        "design_tokens": schema.design_tokens if schema else {},
+        "global_config": schema.global_config if schema else {},
+        "components": library,
+    }
+
+
 async def _apply_verification_revisions(
     session: AsyncSession,
     envelope: MessageEnvelope,
 ) -> None:
-    """Persist revision instructions when verification requests changes."""
-    revisions = envelope.payload.get("revisions") or []
-    for item in revisions:
+    """Persist revision instructions from blocking verification issues."""
+    seen: set[int] = set()
+    for item in envelope.payload.get("revisions") or []:
         raw_id = item.get("component_id")
         if raw_id is None:
             continue
         component_id = int(raw_id)
+        if component_id in seen:
+            continue
+        seen.add(component_id)
         component = await session.scalar(
             select(Component).where(Component.id == component_id)
         )
         if component is None:
             continue
-        component.revision_instruction = item.get("revision_instruction")
-        component.status = ComponentStatus.revised
+        instruction = item.get("revision_instruction") or item.get("message")
+        if isinstance(instruction, str) and instruction.strip():
+            component.revision_instruction = instruction.strip()
+            component.status = ComponentStatus.revised
+
+    for issue in envelope.payload.get("issues") or []:
+        if issue.get("priority") not in ("P1", "P2"):
+            continue
+        raw_id = issue.get("component_id")
+        if raw_id is None:
+            continue
+        component_id = int(raw_id)
+        if component_id in seen:
+            continue
+        seen.add(component_id)
+        component = await session.scalar(
+            select(Component).where(Component.id == component_id)
+        )
+        if component is None:
+            continue
+        message = issue.get("message")
+        if isinstance(message, str) and message.strip():
+            component.revision_instruction = message.strip()
+            component.status = ComponentStatus.revised
+
+    await session.flush()
+
+
+async def _fanout_revision_generates(
+    session: AsyncSession,
+    envelope: MessageEnvelope,
+    state: PipelineState,
+    broker: MessageBroker,
+) -> None:
+    """Re-queue component.generate for components marked revised."""
+    schema = await _latest_schema_for_project(session, envelope.project_id)
+    result = await session.execute(
+        select(Component)
+        .where(
+            Component.project_id == envelope.project_id,
+            Component.status == ComponentStatus.revised,
+        )
+        .order_by(Component.spec_index.asc())
+    )
+    components = result.scalars().all()
+    if not components:
+        return
+
+    revision_round = state.revision_round
+    state.expected_components = len(components)
+    state.resolved_components = 0
+
+    for component in components:
+        spec = _spec_for_component(schema, component.spec_index)
+        component.status = ComponentStatus.generating
+        work = MessageEnvelope(
+            event=COMPONENT_GENERATE_EVENT,
+            project_id=envelope.project_id,
+            pipeline_id=envelope.pipeline_id,
+            component_id=component.id,
+            attempt=Attempt(
+                retry_count=component.retry_count,
+                revision_round=revision_round,
+            ),
+            payload={
+                "spec": spec,
+                "spec_index": component.spec_index,
+                "design_tokens": schema.design_tokens if schema else None,
+                "global_config": schema.global_config if schema else None,
+                "revision_instruction": component.revision_instruction,
+            },
+        )
+        await broker.publish(COMPONENT_GENERATE, work)
+
     await session.flush()
 
 

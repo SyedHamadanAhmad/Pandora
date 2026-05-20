@@ -30,11 +30,13 @@ from pandora_shared.payloads import (
     ParseUrlWorkPayload,
     SchemaReadyPayload,
     SchemaRequestWorkPayload,
+    ShowcaseGenerateWorkPayload,
     ShowcaseReadyPayload,
     ShowcaseScenePayload,
     VerificationCompletePayload,
     VerificationIssuePayload,
     VerificationPriority,
+    VerificationStartWorkPayload,
 )
 from pandora_shared import queues
 
@@ -67,9 +69,11 @@ __all__ = [
     "SCHEMA_REQUEST_EVENT",
     "SchemaReadyPayload",
     "SchemaRequestWorkPayload",
+    "ShowcaseGenerateWorkPayload",
     "ShowcaseReadyPayload",
     "ShowcaseScenePayload",
     "VerificationCompletePayload",
+    "VerificationStartWorkPayload",
     "VerificationIssuePayload",
     "VerificationPriority",
     "build_idempotency_key",

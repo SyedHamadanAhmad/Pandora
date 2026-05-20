@@ -131,6 +131,7 @@ services:
       - pandora-net
 
   worker-verification:
+    <<: *agent-restart
     profiles: ["agents-downstream"]
     build:
       context: .
@@ -146,6 +147,7 @@ services:
       - pandora-net
 
   worker-showcase:
+    <<: *agent-restart
     profiles: ["agents-downstream"]
     build:
       context: .

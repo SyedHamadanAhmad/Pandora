@@ -142,14 +142,31 @@ class VerificationIssuePayload(BaseModel):
     model_config = {"extra": "allow"}
 
 
+class VerificationStartWorkPayload(BaseModel):
+    """Work on ``pandora.verification.start``."""
+
+    design_tokens: dict[str, Any] | None = None
+    global_config: dict[str, Any] | None = None
+    components: list[dict[str, Any]] = Field(default_factory=list)
+
+
 class VerificationCompletePayload(BaseModel):
     """Result on ``pandora.verification.complete``."""
 
     issues: list[VerificationIssuePayload] = Field(default_factory=list)
     approved: bool = False
+    revisions: list[dict[str, Any]] = Field(default_factory=list)
 
     def has_blocking_issues(self) -> bool:
         return any(issue.priority in ("P1", "P2") for issue in self.issues)
+
+
+class ShowcaseGenerateWorkPayload(BaseModel):
+    """Work on ``pandora.showcase.generate``."""
+
+    design_tokens: dict[str, Any] | None = None
+    global_config: dict[str, Any] | None = None
+    components: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class ShowcaseScenePayload(BaseModel):

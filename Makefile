@@ -6,12 +6,14 @@ COMPOSE_PARSE_E2E := $(COMPOSE_AGENTS_PARSE) -f docker-compose.stub.yml --profil
 COMPOSE_BRIEF_E2E := $(COMPOSE_DEV) -f docker-compose.agents.yml \
 	--profile agents-parse --profile agents-downstream \
 	-f docker-compose.stub.yml --profile stub
+COMPOSE_AGENTS_FULL := $(COMPOSE_DEV) -f docker-compose.agents.yml \
+	--profile agents-parse --profile agents-downstream
 
 # Default parallelism for component.generate / component.generated consumers
 COMPONENT_GEN_SCALE ?= 5
 FEEDBACK_SCALE ?= 5
 
-.PHONY: dev dev-stub dev-agents dev-parse-agents dev-parse-e2e dev-brief-e2e dev-phase5-e2e dev-phase6-e2e down-phase6-e2e up down logs migrate test test-integration phase2-gate shell scale-component-gen scale-feedback check-env test-parse-unit test-phase6-unit
+.PHONY: dev dev-stub dev-agents dev-parse-agents dev-parse-e2e dev-brief-e2e dev-phase5-e2e dev-phase6-e2e dev-phase7-e2e down-phase6-e2e down-phase7-e2e up down logs migrate test test-integration phase2-gate shell scale-component-gen scale-feedback check-env test-parse-unit test-phase6-unit test-phase7-unit
 
 check-env:
 	@test -f .env || (echo "Missing .env — run: cp .env.example .env" && exit 1)
@@ -25,7 +27,7 @@ dev-stub: check-env
 dev-parse-agents: check-env
 	$(COMPOSE_AGENTS_PARSE) up --build
 
-dev-agents: dev-parse-agents
+dev-agents: dev-phase7-e2e
 
 # Parse agents + stub downstream (brief/schema) — do not run stub-parse-* with real parse workers
 dev-parse-e2e: check-env
@@ -51,6 +53,18 @@ dev-phase6-e2e: check-env down-phase6-e2e
 		worker-parse-text worker-parse-url worker-brief worker-schema \
 		worker-component-gen worker-feedback stub-downstream
 
+# Full real-agent pipeline (no stub-downstream).
+down-phase7-e2e:
+	$(COMPOSE_AGENTS_FULL) down --remove-orphans
+
+dev-phase7-e2e: check-env down-phase7-e2e
+	STUB_SKIP_BRIEF=1 STUB_SKIP_SCHEMA=1 STUB_SKIP_COMPONENT=1 $(COMPOSE_AGENTS_FULL) up -d --build --wait postgres rabbitmq minio backend
+	$(COMPOSE_AGENTS_FULL) up --build \
+		--scale worker-component-gen=$(COMPONENT_GEN_SCALE) \
+		--scale worker-feedback=$(FEEDBACK_SCALE) \
+		worker-parse-text worker-parse-url worker-brief worker-schema \
+		worker-component-gen worker-feedback worker-verification worker-showcase
+
 # Alias: brief-only real agent (stub still handles schema unless you use dev-phase5-e2e).
 dev-brief-e2e: check-env
 	STUB_SKIP_BRIEF=1 $(COMPOSE_BRIEF_E2E) up --build \
@@ -67,6 +81,12 @@ test-phase6-unit:
 	@PYTHONPATH=workers/src:pandora_shared python3.11 -m unittest \
 	  backend.tests.unit.test_component_gen_agent \
 	  backend.tests.unit.test_feedback_agent \
+	  -v
+
+test-phase7-unit:
+	@PYTHONPATH=workers/src:pandora_shared python3.11 -m unittest \
+	  backend.tests.unit.test_verification_agent \
+	  backend.tests.unit.test_showcase_agent \
 	  -v
 
 up: check-env

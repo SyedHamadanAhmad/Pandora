@@ -8,14 +8,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.middleware.session_auth import get_current_user_id
+from app.models.component import Component
 from app.models.project import Project
+from app.models.showcase_scene import ShowcaseScene
 from app.schemas.component import ComponentListResponse
 from app.schemas.project import (
     CreateProjectRequest,
     ProjectListResponse,
     ProjectResponse,
 )
-from app.schemas.showcase import ShowcaseListResponse
+from app.schemas.component import ComponentResponse
+from app.schemas.showcase import ShowcaseListResponse, ShowcaseSceneResponse
 from pandora_shared.enums import ProjectStatus
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
@@ -84,7 +87,15 @@ async def list_components(
     db: AsyncSession = Depends(get_db),
 ) -> ComponentListResponse:
     await _get_project_for_user(db, project_id, user_id)
-    return ComponentListResponse(components=[])
+    result = await db.execute(
+        select(Component)
+        .where(Component.project_id == project_id)
+        .order_by(Component.spec_index.asc())
+    )
+    components = result.scalars().all()
+    return ComponentListResponse(
+        components=[ComponentResponse.model_validate(c) for c in components]
+    )
 
 
 @router.get("/{project_id}/showcase", response_model=ShowcaseListResponse)
@@ -94,7 +105,15 @@ async def list_showcase_scenes(
     db: AsyncSession = Depends(get_db),
 ) -> ShowcaseListResponse:
     await _get_project_for_user(db, project_id, user_id)
-    return ShowcaseListResponse(scenes=[])
+    result = await db.execute(
+        select(ShowcaseScene)
+        .where(ShowcaseScene.project_id == project_id)
+        .order_by(ShowcaseScene.scene_index.asc())
+    )
+    scenes = result.scalars().all()
+    return ShowcaseListResponse(
+        scenes=[ShowcaseSceneResponse.model_validate(s) for s in scenes]
+    )
 
 
 @router.get("/{project_id}", response_model=ProjectResponse)

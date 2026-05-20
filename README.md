@@ -37,7 +37,8 @@ Open:
 | `make migrate` | Run `alembic upgrade head` |
 | `make logs` | Tail all service logs |
 | `make shell s=backend` | Shell into a running container |
-| `make dev-phase6-e2e` | Phase 6 E2E (5× component-gen + 5× feedback by default) |
+| `make dev-phase7-e2e` | Full real agents (parse → showcase, 5× gen + feedback) |
+| `make dev-phase6-e2e` | Phase 6 E2E (stub verify/showcase) |
 | `make scale-component-gen n=5` | Scale component generation workers |
 | `make scale-feedback n=5` | Scale feedback validation workers |
 | `make dev-parse-agents` | Phase 4 parse workers (text, image, url) |
