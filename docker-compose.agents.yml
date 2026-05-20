@@ -64,6 +64,7 @@ services:
       dockerfile: workers/Dockerfile.base
     command: ["python", "-m", "pandora_workers.run.brief"]
     env_file: .env
+    volumes: *agent-volumes
     depends_on:
       rabbitmq:
         condition: service_healthy

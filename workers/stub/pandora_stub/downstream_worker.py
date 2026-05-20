@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 
 from aio_pika.abc import AbstractChannel, AbstractIncomingMessage
 
@@ -171,6 +172,10 @@ async def _handle_showcase_generate(
     logger.info("stub showcase.ready project_id=%s", work.project_id)
 
 
+def _truthy_env(name: str) -> bool:
+    return os.environ.get(name, "").strip().lower() in {"1", "true", "yes", "on"}
+
+
 async def main() -> None:
     configure_logging("pandora_stub.downstream")
     connection = await connect()
@@ -178,13 +183,19 @@ async def main() -> None:
     await declare_topology(declare_channel)
     await declare_channel.close()
 
-    bindings = [
-        (BRIEF_REQUEST, _handle_brief_request),
-        (SCHEMA_REQUEST, _handle_schema_request),
-        (COMPONENT_GENERATE, _handle_component_generate),
-        (VERIFICATION_START, _handle_verification_start),
-        (SHOWCASE_GENERATE, _handle_showcase_generate),
-    ]
+    bindings: list[tuple[str, object]] = []
+    if not _truthy_env("STUB_SKIP_BRIEF"):
+        bindings.append((BRIEF_REQUEST, _handle_brief_request))
+    else:
+        logger.info("STUB_SKIP_BRIEF set — not consuming pandora.brief.request (use worker-brief)")
+    bindings.extend(
+        [
+            (SCHEMA_REQUEST, _handle_schema_request),
+            (COMPONENT_GENERATE, _handle_component_generate),
+            (VERIFICATION_START, _handle_verification_start),
+            (SHOWCASE_GENERATE, _handle_showcase_generate),
+        ]
+    )
     logger.info(
         "stub downstream worker listening on %s",
         ", ".join(queue for queue, _ in bindings),

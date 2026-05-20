@@ -3,8 +3,11 @@ COMPOSE_DEV := $(COMPOSE) -f docker-compose.yml -f docker-compose.dev.yml
 COMPOSE_STUB := $(COMPOSE_DEV) -f docker-compose.stub.yml --profile stub
 COMPOSE_AGENTS_PARSE := $(COMPOSE_DEV) -f docker-compose.agents.yml --profile agents-parse
 COMPOSE_PARSE_E2E := $(COMPOSE_AGENTS_PARSE) -f docker-compose.stub.yml --profile stub
+COMPOSE_BRIEF_E2E := $(COMPOSE_DEV) -f docker-compose.agents.yml \
+	--profile agents-parse --profile agents-downstream \
+	-f docker-compose.stub.yml --profile stub
 
-.PHONY: dev dev-stub dev-agents dev-parse-agents dev-parse-e2e up down logs migrate test test-integration phase2-gate shell scale-component check-env test-parse-unit
+.PHONY: dev dev-stub dev-agents dev-parse-agents dev-parse-e2e dev-brief-e2e up down logs migrate test test-integration phase2-gate shell scale-component check-env test-parse-unit
 
 check-env:
 	@test -f .env || (echo "Missing .env — run: cp .env.example .env" && exit 1)
@@ -24,8 +27,16 @@ dev-agents: dev-parse-agents
 dev-parse-e2e: check-env
 	$(COMPOSE_PARSE_E2E) up --build worker-parse-text worker-parse-image worker-parse-url stub-downstream
 
+# Text+URL parse agents + real BriefAgent + stub downstream (schema skips brief; set in compose env)
+dev-brief-e2e: check-env
+	STUB_SKIP_BRIEF=1 $(COMPOSE_BRIEF_E2E) up --build \
+		worker-parse-text worker-parse-url worker-brief stub-downstream
+
 test-parse-unit:
-	@PYTHONPATH=workers/src python3.11 -m unittest backend.tests.unit.test_parse_agents -v
+	@PYTHONPATH=workers/src:pandora_shared python3.11 -m unittest \
+	  backend.tests.unit.test_parse_agents \
+	  backend.tests.unit.test_brief_agent \
+	  -v
 
 up: check-env
 	$(COMPOSE) -f docker-compose.yml -f docker-compose.prod.yml up --build -d

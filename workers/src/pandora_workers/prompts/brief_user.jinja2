@@ -1,0 +1,28 @@
+You are synthesizing a single design brief from merged parse outputs. The consumer will attach `input_gaps` itself — do **not** include `input_gaps` in your JSON.
+
+## Parse sources (JSON)
+
+{{ sources_json }}
+
+## Known input gaps (informational; do not echo in JSON)
+
+{% if input_gaps %}
+{% for gap in input_gaps %}
+- {{ gap }}
+{% endfor %}
+{% else %}
+(none)
+{% endif %}
+
+---
+
+Return a **single JSON object** with **exactly** these keys (no others):
+
+- `color_tokens` (object): map semantic roles to hex or CSS colors, e.g. `{"primary": "#2563eb", "secondary": "#64748b", "accent": "#f59e0b"}`. Prefer values from URL/image parse when present; otherwise infer from tone and industry.
+- `typography_scale` (object): e.g. `{"base": "16px", "heading": "24px", "font_sans": "Inter"}`. Use URL `fonts` when available.
+- `spacing_system` (object): e.g. `{"unit": 4}` or `{"base_px": 8, "scale": [4, 8, 16, 24]}`.
+- `design_flavour` (string): short label, e.g. `modern-saas`, `editorial`, `playful-consumer`.
+- `tone` (string): voice/tone, e.g. `professional`, `friendly`, `technical`.
+- `component_list` (array of strings): **at most 15** unique UI building blocks (e.g. `Button`, `Card`, `Navigation`, `Hero`). Prefer URL `component_candidates` when present; merge with text-derived needs; use TitleCase names without duplicates.
+
+Use `null` for any object key only if truly unknowable; prefer sensible defaults over null for `spacing_system`.

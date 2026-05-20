@@ -51,6 +51,9 @@ services:
       context: .
       dockerfile: workers/stub/Dockerfile
     env_file: .env
+    environment:
+      # When 1, stub does not bind pandora.brief.request (run worker-brief instead).
+      STUB_SKIP_BRIEF: ${STUB_SKIP_BRIEF:-}
     depends_on:
       rabbitmq:
         condition: service_healthy
