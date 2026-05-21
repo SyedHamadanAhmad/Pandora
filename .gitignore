@@ -19,4 +19,4 @@ frontend/dist/
 .idea/
 .vscode/
 *.pdf
-/docs/*.md
+/docs/
