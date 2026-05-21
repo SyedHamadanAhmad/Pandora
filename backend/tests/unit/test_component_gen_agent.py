@@ -19,8 +19,8 @@ from pandora_workers.agents.component_gen import (  # noqa: E402
     _fallback_component,
     _merge_llm_component,
     _safe_component_name,
-    _spec_type,
 )
+from pandora_workers.component_api_contracts import infer_spec_type  # noqa: E402
 
 
 class ComponentGenHelperTests(unittest.TestCase):
@@ -36,6 +36,9 @@ class ComponentGenHelperTests(unittest.TestCase):
         self.assertIn("primary", payload.variants)
         self.assertIn("Button", payload.tsx_code)
         self.assertIn("<button", payload.tsx_code)
+        self.assertIn("label: string", payload.tsx_code)
+        self.assertIn("onClick={onClick}", payload.tsx_code)
+        self.assertNotIn("children:", payload.tsx_code)
 
     def test_fallback_card_uses_article_not_button_root(self) -> None:
         out = _fallback_component(
@@ -47,7 +50,8 @@ class ComponentGenHelperTests(unittest.TestCase):
         self.assertNotIn("<button", payload.tsx_code)
 
     def test_spec_type_from_name(self) -> None:
-        self.assertEqual(_spec_type({"name": "PrimaryNav"}), "navigation")
+        self.assertEqual(infer_spec_type({"name": "PrimaryNav"}), "navigation")
+        self.assertEqual(infer_spec_type({"name": "NewBadge"}), "badge")
 
     def test_merge_requires_tsx(self) -> None:
         merged = _merge_llm_component(
@@ -58,6 +62,7 @@ class ComponentGenHelperTests(unittest.TestCase):
         )
         self.assertIn("Card", merged["tsx_code"])
         self.assertIn("<article", merged["tsx_code"])
+        self.assertIn("title: string", merged["tsx_code"])
 
 
 class ComponentGenAgentTests(unittest.IsolatedAsyncioTestCase):
@@ -78,7 +83,11 @@ class ComponentGenAgentTests(unittest.IsolatedAsyncioTestCase):
             },
         )
         llm_out = {
-            "tsx_code": "export function Button() { return <button>OK</button>; }",
+            "tsx_code": (
+                "export type ButtonProps = { label: string; onClick?: () => void };\n"
+                "export function Button({ label, onClick }: ButtonProps) {"
+                " return <button type=\"button\" onClick={onClick}>{label}</button>; }"
+            ),
             "css_code": ".btn { color: red; }",
             "props": {"label": "OK"},
             "variants": ["primary"],

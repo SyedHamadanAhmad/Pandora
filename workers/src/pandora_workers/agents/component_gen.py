@@ -16,6 +16,12 @@ from pandora_shared.payloads import (
 from pandora_shared.queues import COMPONENT_GENERATED, COMPONENT_GENERATE
 
 from pandora_workers.base_agent import BaseAgent
+from pandora_workers.component_api_contracts import (
+    check_api_contract,
+    default_props_for_type,
+    infer_spec_type,
+    prompt_context_for_type,
+)
 from pandora_workers.envelopes import build_result
 from pandora_workers.llm import complete_json
 from pandora_workers.prompts.loader import render_prompt
@@ -43,26 +49,6 @@ def _json_for_prompt(obj: Any, *, max_chars: int = _MAX_PROMPT_CHARS) -> str:
     if len(raw) <= max_chars:
         return raw
     return raw[:max_chars] + '"…[truncated]"'
-
-
-def _spec_type(spec: dict[str, Any]) -> str:
-    raw = spec.get("type")
-    if isinstance(raw, str) and raw.strip():
-        return raw.strip().lower()
-    name = str(spec.get("name") or "").lower()
-    if "button" in name or "cta" in name:
-        return "button"
-    if "card" in name or "tile" in name:
-        return "card"
-    if "nav" in name or "menu" in name or "tab" in name:
-        return "navigation"
-    if "input" in name or "field" in name or "search" in name:
-        return "input"
-    if "modal" in name or "dialog" in name:
-        return "modal"
-    if "hero" in name or "banner" in name:
-        return "hero"
-    return "layout"
 
 
 def _typography_for_prompt(
@@ -120,6 +106,11 @@ def _normalize_variants(spec: dict[str, Any], llm: dict[str, Any]) -> list[str]:
     return ["default"]
 
 
+def _variant_union(variants: list[str]) -> str:
+    quoted = " | ".join(repr(v) for v in variants[:4])
+    return quoted or "'default'"
+
+
 def _fallback_button(
     name: str,
     *,
@@ -133,23 +124,31 @@ def _fallback_button(
     pad_v = unit * 2
     pad_h = unit * 4
     variants = _normalize_variants(spec, {})
+    variant_union = _variant_union(variants)
+    defaults = default_props_for_type("button")
+    label_default = str(defaults.get("label") or "Continue")
     return {
         "tsx_code": (
-            f"import type {{ ReactNode }} from 'react';\n\n"
             f"export type {name}Props = {{\n"
-            f"  label?: string;\n"
-            f"  children?: ReactNode;\n"
-            f"  variant?: {' | '.join(repr(v) for v in variants[:4])};\n"
+            f"  label: string;\n"
+            f"  onClick?: () => void;\n"
+            f"  variant?: {variant_union};\n"
             f"  disabled?: boolean;\n"
             f"}};\n\n"
-            f"export function {name}({{ label = 'Continue', children, variant = '{variants[0]}', disabled }}: {name}Props) {{\n"
+            f"export function {name}({{\n"
+            f"  label = '{label_default}',\n"
+            f"  onClick,\n"
+            f"  variant = '{variants[0]}',\n"
+            f"  disabled,\n"
+            f"}}: {name}Props) {{\n"
             f"  return (\n"
             f"    <button\n"
             f"      type=\"button\"\n"
             f"      className={{`pandora-{lower} pandora-{lower}--${{variant}}`}}\n"
             f"      disabled={{disabled}}\n"
+            f"      onClick={{onClick}}\n"
             f"    >\n"
-            f"      {{children ?? label}}\n"
+            f"      {{label}}\n"
             f"    </button>\n"
             f"  );\n"
             f"}}\n"
@@ -178,7 +177,7 @@ def _fallback_button(
             f"  border: 1px solid {primary};\n"
             f"}}\n"
         ),
-        "props": {"label": "Continue", "variant": variants[0]},
+        "props": {"label": label_default, "variant": variants[0]},
         "variants": variants,
     }
 
@@ -194,18 +193,20 @@ def _fallback_card(
     primary = _primary_color(design_tokens)
     unit = _spacing_unit_px(design_tokens, global_config)
     variants = _normalize_variants(spec, {})
+    defaults = default_props_for_type("card")
+    title_default = str(defaults.get("title") or "Card title")
     return {
         "tsx_code": (
             f"import type {{ ReactNode }} from 'react';\n\n"
             f"export type {name}Props = {{\n"
-            f"  title?: string;\n"
+            f"  title: string;\n"
             f"  children?: ReactNode;\n"
             f"}};\n\n"
-            f"export function {name}({{ title = 'Card title', children }}: {name}Props) {{\n"
+            f"export function {name}({{ title = '{title_default}', children }}: {name}Props) {{\n"
             f"  return (\n"
             f"    <article className=\"pandora-{lower}\">\n"
             f"      <header className=\"pandora-{lower}__header\">{{title}}</header>\n"
-            f"      <div className=\"pandora-{lower}__body\">{{children ?? 'Card content'}}</div>\n"
+            f"      <div className=\"pandora-{lower}__body\">{{children ?? null}}</div>\n"
             f"    </article>\n"
             f"  );\n"
             f"}}\n"
@@ -230,7 +231,49 @@ def _fallback_card(
             f"  color: #334155;\n"
             f"}}\n"
         ),
-        "props": {"title": "Card title"},
+        "props": {"title": title_default, "children": defaults.get("children")},
+        "variants": variants,
+    }
+
+
+def _fallback_badge(
+    name: str,
+    *,
+    spec: dict[str, Any],
+    design_tokens: dict[str, Any] | None,
+    global_config: dict[str, Any] | None,
+) -> dict[str, Any]:
+    lower = name.lower()
+    primary = _primary_color(design_tokens)
+    unit = _spacing_unit_px(design_tokens, global_config)
+    variants = _normalize_variants(spec, {})
+    variant_union = _variant_union(variants)
+    defaults = default_props_for_type("badge")
+    text_default = str(defaults.get("text") or "New")
+    return {
+        "tsx_code": (
+            f"export type {name}Props = {{\n"
+            f"  text: string;\n"
+            f"  variant?: {variant_union};\n"
+            f"}};\n\n"
+            f"export function {name}({{ text = '{text_default}', variant = '{variants[0]}' }}: {name}Props) {{\n"
+            f"  return (\n"
+            f"    <span className={{`pandora-{lower} pandora-{lower}--${{variant}}`}}>{{text}}</span>\n"
+            f"  );\n"
+            f"}}\n"
+        ),
+        "css_code": (
+            f".pandora-{lower} {{\n"
+            f"  display: inline-block;\n"
+            f"  padding: {unit}px {unit * 2}px;\n"
+            f"  font-size: 12px;\n"
+            f"  font-weight: 600;\n"
+            f"  border-radius: {unit * 2}px;\n"
+            f"  background: {primary};\n"
+            f"  color: #fff;\n"
+            f"}}\n"
+        ),
+        "props": {"text": text_default, "variant": variants[0]},
         "variants": variants,
     }
 
@@ -246,13 +289,14 @@ def _fallback_nav(
     primary = _primary_color(design_tokens)
     unit = _spacing_unit_px(design_tokens, global_config)
     variants = _normalize_variants(spec, {})
+    defaults = default_props_for_type("navigation")
     return {
         "tsx_code": (
             f"export type {name}Props = {{\n"
-            f"  items?: string[];\n"
+            f"  items: string[];\n"
             f"  activeIndex?: number;\n"
             f"}};\n\n"
-            f"export function {name}({{ items = ['Home', 'Products', 'About'], activeIndex = 0 }}: {name}Props) {{\n"
+            f"export function {name}({{ items = {defaults.get('items')!r}, activeIndex = 0 }}: {name}Props) {{\n"
             f"  return (\n"
             f"    <nav className=\"pandora-{lower}\" aria-label=\"Main\">\n"
             f"      <ul className=\"pandora-{lower}__list\">\n"
@@ -293,7 +337,10 @@ def _fallback_nav(
             f"  outline-offset: 2px;\n"
             f"}}\n"
         ),
-        "props": {"items": ["Home", "Products", "About"], "activeIndex": 0},
+        "props": {
+            "items": defaults.get("items"),
+            "activeIndex": defaults.get("activeIndex", 0),
+        },
         "variants": variants,
     }
 
@@ -309,14 +356,15 @@ def _fallback_input(
     primary = _primary_color(design_tokens)
     unit = _spacing_unit_px(design_tokens, global_config)
     variants = _normalize_variants(spec, {})
+    defaults = default_props_for_type("input")
     return {
         "tsx_code": (
             f"export type {name}Props = {{\n"
-            f"  label?: string;\n"
+            f"  label: string;\n"
             f"  placeholder?: string;\n"
             f"  error?: string;\n"
             f"}};\n\n"
-            f"export function {name}({{ label = 'Label', placeholder = 'Enter text', error }}: {name}Props) {{\n"
+            f"export function {name}({{ label = '{defaults.get('label')}', placeholder = 'Enter text', error }}: {name}Props) {{\n"
             f"  const inputId = 'pandora-{lower}-input';\n"
             f"  return (\n"
             f"    <div className=\"pandora-{lower}\">\n"
@@ -342,7 +390,10 @@ def _fallback_input(
             f"}}\n"
             f".pandora-{lower}__error {{ font-size: 12px; color: #dc2626; }}\n"
         ),
-        "props": {"label": "Label", "placeholder": "Enter text"},
+        "props": {
+            "label": defaults.get("label"),
+            "placeholder": defaults.get("placeholder"),
+        },
         "variants": variants,
     }
 
@@ -358,14 +409,16 @@ def _fallback_layout(
     primary = _primary_color(design_tokens)
     unit = _spacing_unit_px(design_tokens, global_config)
     variants = _normalize_variants(spec, {})
+    defaults = default_props_for_type("layout")
+    title_default = str(defaults.get("title") or name)
     return {
         "tsx_code": (
             f"import type {{ ReactNode }} from 'react';\n\n"
             f"export type {name}Props = {{\n"
-            f"  title?: string;\n"
+            f"  title: string;\n"
             f"  children?: ReactNode;\n"
             f"}};\n\n"
-            f"export function {name}({{ title = '{name}', children }}: {name}Props) {{\n"
+            f"export function {name}({{ title = '{title_default}', children }}: {name}Props) {{\n"
             f"  return (\n"
             f"    <section className=\"pandora-{lower}\">\n"
             f"      <h2 className=\"pandora-{lower}__title\">{{title}}</h2>\n"
@@ -388,7 +441,7 @@ def _fallback_layout(
             f"  color: #334155;\n"
             f"}}\n"
         ),
-        "props": {"title": name},
+        "props": {"title": title_default},
         "variants": variants,
     }
 
@@ -396,6 +449,7 @@ def _fallback_layout(
 _FALLBACK_BY_TYPE: dict[str, Callable[..., dict[str, Any]]] = {
     "button": _fallback_button,
     "card": _fallback_card,
+    "badge": _fallback_badge,
     "navigation": _fallback_nav,
     "input": _fallback_input,
     "modal": _fallback_layout,
@@ -411,7 +465,7 @@ def _fallback_component(
     global_config: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     name = _safe_component_name(spec.get("name"))
-    typ = _spec_type(spec)
+    typ = infer_spec_type(spec)
     factory = _FALLBACK_BY_TYPE.get(typ, _fallback_layout)
     return factory(
         name,
@@ -458,6 +512,38 @@ def _merge_llm_component(
     }
 
 
+def _ensure_api_contract(
+    merged: dict[str, Any],
+    *,
+    spec: dict[str, Any],
+    design_tokens: dict[str, Any] | None,
+    global_config: dict[str, Any] | None,
+) -> dict[str, Any]:
+    """Replace output with type fallback when TSX violates API contract."""
+    spec_type = infer_spec_type(spec)
+    tsx = merged.get("tsx_code")
+    if not isinstance(tsx, str):
+        return _fallback_component(
+            spec,
+            design_tokens=design_tokens,
+            global_config=global_config,
+        )
+    violations = check_api_contract(tsx, spec_type)
+    if violations:
+        logger.warning(
+            "component_gen api contract failed type=%s name=%s: %s",
+            spec_type,
+            spec.get("name"),
+            "; ".join(violations[:3]),
+        )
+        return _fallback_component(
+            spec,
+            design_tokens=design_tokens,
+            global_config=global_config,
+        )
+    return merged
+
+
 class ComponentGenAgent(BaseAgent):
     work_queue = COMPONENT_GENERATE
     result_queue = COMPONENT_GENERATED
@@ -473,8 +559,9 @@ class ComponentGenAgent(BaseAgent):
         revision = work_payload.revision_instruction
 
         name = _safe_component_name(spec.get("name"))
-        spec_type = _spec_type(spec)
+        spec_type = infer_spec_type(spec)
         tokens_dict = design_tokens if isinstance(design_tokens, dict) else None
+        api_ctx = prompt_context_for_type(spec_type)
 
         system = render_prompt("component_engineer_system.jinja2")
         user = render_prompt(
@@ -488,6 +575,7 @@ class ComponentGenAgent(BaseAgent):
             component_name=name,
             component_name_lower=name.lower(),
             spec_type=spec_type,
+            **api_ctx,
         )
 
         merged: dict[str, Any]
@@ -520,6 +608,12 @@ class ComponentGenAgent(BaseAgent):
             )
 
         try:
+            merged = _ensure_api_contract(
+                merged,
+                spec=spec,
+                design_tokens=tokens_dict,
+                global_config=global_config,
+            )
             validated = ComponentGeneratedPayload.model_validate(merged)
         except Exception as exc:
             logger.warning(

@@ -49,6 +49,8 @@ def _guess_component_type(name: str) -> str:
     key = name.lower()
     if "button" in key or "cta" in key:
         return "button"
+    if "badge" in key or "chip" in key or "tag" in key:
+        return "badge"
     if "input" in key or "field" in key or "search" in key:
         return "input"
     if "card" in key or "tile" in key:

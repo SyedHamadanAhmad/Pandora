@@ -7,9 +7,12 @@ ESLint is not run on ``.tsx`` here: the default ESLint parser cannot parse TypeS
 from __future__ import annotations
 
 import asyncio
+import re
 import shutil
 import tempfile
 from pathlib import Path
+
+from pandora_workers.component_api_contracts import check_api_contract
 
 _TS_CONFIG = """{
   "compilerOptions": {
@@ -113,9 +116,25 @@ def _write_component_files(root: Path, tsx_code: str, css_code: str | None) -> P
     return component_path
 
 
+def _component_name_from_tsx(tsx_code: str) -> str | None:
+    match = re.search(r"export\s+function\s+(\w+)", tsx_code)
+    return match.group(1) if match else None
+
+
+def _spec_type_from_tsx(tsx_code: str) -> str:
+    from pandora_workers.component_api_contracts import infer_spec_type
+
+    name = _component_name_from_tsx(tsx_code)
+    if not name:
+        return "layout"
+    return infer_spec_type({"name": name})
+
+
 async def run_tsc_and_eslint(
     tsx_code: str,
     css_code: str | None = None,
+    *,
+    spec_type: str | None = None,
 ) -> tuple[bool, list[str]]:
     """
     Validate generated TSX in a temp project via ``tsc --noEmit``.
@@ -136,5 +155,10 @@ async def run_tsc_and_eslint(
         tsc_code, tsc_out = await _run_cmd("npx", "tsc", "--noEmit", cwd=root)
         if tsc_code != 0:
             errors.append(tsc_out or "tsc failed")
+
+    resolved_type = spec_type or _spec_type_from_tsx(tsx_code)
+    api_errors = check_api_contract(tsx_code, resolved_type)
+    for msg in api_errors:
+        errors.append(f"api contract: {msg}")
 
     return len(errors) == 0, errors[:5]

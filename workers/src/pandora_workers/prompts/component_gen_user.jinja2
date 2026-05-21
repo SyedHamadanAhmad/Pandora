@@ -28,29 +28,29 @@ You are generating **one React component** for a design-system POC.
 
 ---
 
-## Type-specific requirements (spec type: {{ spec_type }})
+## Type-specific markup (spec type: {{ spec_type }})
 
 {% if spec_type == 'button' %}
-- Variants (primary, secondary, ghost, etc.) must differ in background, border, and color using design tokens.
-- Include hover, focus-visible, and disabled states in CSS.
-- Use `<button type="button">` as the interactive root.
+- Label-only API: required `label: string` and `onClick?: () => void` — do not use `children`.
+- Render `<button type="button" onClick={onClick}>{label}</button>`.
+- Variants must differ using design tokens; include hover, focus-visible, disabled in CSS.
 {% elif spec_type == 'card' %}
-- Structure: header, body, and optional footer regions inside a card container.
-- Use elevation (border or shadow) and radius from tokens; do not use `<button>` as the root element.
+- Root: `<article>` with header + body; border/shadow from tokens.
+{% elif spec_type == 'badge' %}
+- Root: `<span>` (inline); compact padding; token-based colors.
 {% elif spec_type == 'navigation' %}
-- Use `<nav>` with list semantics (`<ul>` / `<li>` or accessible equivalent).
-- Include an active/current state style for one item.
+- `<nav>` with `<ul>` / `<li>`; active link state.
 {% elif spec_type == 'input' %}
-- Associate `<label>` with `<input>`; support error/disabled visual states using tokens.
+- `<label htmlFor>` + `<input id>`.
 {% elif spec_type == 'modal' %}
-- Use dialog semantics (role="dialog", labelled title); overlay + panel; focus trap implied in markup comments if needed.
-{% elif spec_type == 'layout' or spec_type == 'hero' %}
-- Use semantic layout markup (`section`, `header`) appropriate to the component name.
-- No button root unless the spec name implies a CTA-only widget.
+- `role="dialog"`, labelled title, overlay + panel.
+{% elif spec_type == 'hero' or spec_type == 'layout' %}
+- `<section>` and heading hierarchy.
 {% else %}
-- Match semantic HTML and layout to type "{{ spec_type }}" and component name {{ component_name }}.
-- Do not default to a plain `<button>` unless type is button.
+- Semantic HTML for type "{{ spec_type }}" and {{ component_name }}.
 {% endif %}
+
+{% include 'component_api_contract.jinja2' %}
 
 {% include 'design_quality_contract.jinja2' %}
 
@@ -58,9 +58,9 @@ You are generating **one React component** for a design-system POC.
 
 Return a **single JSON object** with **exactly** these keys:
 
-- `tsx_code` (string, required): A valid React 18 functional component in TypeScript. Export as `export function {{ component_name }}(...)`. Use only `react` import if needed. Use `className` hooks matching CSS below.
-- `css_code` (string or null): Scoped CSS for this component (class names prefixed with `pandora-{{ component_name_lower }}` when possible).
-- `props` (object or null): Default prop values / prop schema hints.
-- `variants` (array of strings): Echo spec variants when present; otherwise `["default"]`.
+- `tsx_code` (string, required): React 18 + TypeScript. `export function {{ component_name }}(...)`. Import `react` for `ReactNode` when needed. `className` prefix `pandora-{{ component_name_lower }}`.
+- `css_code` (string or null): Scoped CSS.
+- `props` (object): Demo values for **all required** API props (e.g. `label`, `text`, `title` strings for previews; omit `onClick` or use null).
+- `variants` (array of strings): From spec or `["default"]`.
 
-Keep the component small and self-contained. Do not include keys other than the four above.
+Do not include keys other than the four above.
