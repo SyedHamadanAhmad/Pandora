@@ -30,7 +30,7 @@ class ParseTextAgent(BaseAgent):
                 error="empty_content",
             )
 
-        system = render_prompt("json_system.jinja2")
+        system = render_prompt("parse_analyst_system.jinja2")
         user = render_prompt("parse_text_user.jinja2", content=content)
         try:
             data = await complete_json(system, user)

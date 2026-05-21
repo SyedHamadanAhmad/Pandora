@@ -8,6 +8,14 @@ You are generating **one React component** for a design-system POC.
 
 {{ design_tokens_json }}
 
+## Typography (JSON)
+
+{{ typography_json }}
+
+## Spacing system (JSON)
+
+{{ spacing_json }}
+
 ## Global config (JSON)
 
 {{ global_config_json }}
@@ -20,9 +28,37 @@ You are generating **one React component** for a design-system POC.
 
 ---
 
+## Type-specific requirements (spec type: {{ spec_type }})
+
+{% if spec_type == 'button' %}
+- Variants (primary, secondary, ghost, etc.) must differ in background, border, and color using design tokens.
+- Include hover, focus-visible, and disabled states in CSS.
+- Use `<button type="button">` as the interactive root.
+{% elif spec_type == 'card' %}
+- Structure: header, body, and optional footer regions inside a card container.
+- Use elevation (border or shadow) and radius from tokens; do not use `<button>` as the root element.
+{% elif spec_type == 'navigation' %}
+- Use `<nav>` with list semantics (`<ul>` / `<li>` or accessible equivalent).
+- Include an active/current state style for one item.
+{% elif spec_type == 'input' %}
+- Associate `<label>` with `<input>`; support error/disabled visual states using tokens.
+{% elif spec_type == 'modal' %}
+- Use dialog semantics (role="dialog", labelled title); overlay + panel; focus trap implied in markup comments if needed.
+{% elif spec_type == 'layout' or spec_type == 'hero' %}
+- Use semantic layout markup (`section`, `header`) appropriate to the component name.
+- No button root unless the spec name implies a CTA-only widget.
+{% else %}
+- Match semantic HTML and layout to type "{{ spec_type }}" and component name {{ component_name }}.
+- Do not default to a plain `<button>` unless type is button.
+{% endif %}
+
+{% include 'design_quality_contract.jinja2' %}
+
+---
+
 Return a **single JSON object** with **exactly** these keys:
 
-- `tsx_code` (string, required): A valid React 18 functional component in TypeScript. Export as `export function {{ component_name }}(...)`. Use only `react` import if needed. No external UI libraries. Use `className` for styling hooks matching CSS below.
+- `tsx_code` (string, required): A valid React 18 functional component in TypeScript. Export as `export function {{ component_name }}(...)`. Use only `react` import if needed. Use `className` hooks matching CSS below.
 - `css_code` (string or null): Scoped CSS for this component (class names prefixed with `pandora-{{ component_name_lower }}` when possible).
 - `props` (object or null): Default prop values / prop schema hints.
 - `variants` (array of strings): Echo spec variants when present; otherwise `["default"]`.

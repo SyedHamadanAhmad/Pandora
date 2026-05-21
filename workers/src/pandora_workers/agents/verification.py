@@ -133,7 +133,7 @@ class VerificationAgent(BaseAgent):
         work_payload = VerificationStartWorkPayload.model_validate(work.payload)
         work_dict = work_payload.model_dump()
 
-        system = render_prompt("json_system.jinja2")
+        system = render_prompt("design_system_lead_system.jinja2")
         user = render_prompt(
             "verification_user.jinja2",
             design_tokens_json=_json_for_prompt(work_payload.design_tokens or {}),

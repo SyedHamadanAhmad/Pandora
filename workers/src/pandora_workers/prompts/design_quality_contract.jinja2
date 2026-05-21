@@ -1,0 +1,7 @@
+Design Quality Contract (mandatory):
+1. Tokens: Every color in CSS must come from design_tokens (CSS variables or mapped hex). No ad-hoc grays unless defined as neutral in tokens.
+2. Typography: Use fontFamily and scale from design_tokens / typography_scale; minimum body 14px; clear heading hierarchy.
+3. Spacing: Use spacing_system.unit multiples (4px grid default) for padding, margin, and gap.
+4. Components: PascalCase exports; typed props; variants must change visual state (not label text alone).
+5. Accessibility: Focus-visible ring on interactive elements; contrast ratio at least 4.5:1 for primary text on backgrounds.
+6. Scope: No external UI libraries; import react only when needed; className prefix pandora-{componentname} (lowercase component name).

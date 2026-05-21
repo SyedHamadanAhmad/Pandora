@@ -49,7 +49,7 @@ class ParseUrlAgent(BaseAgent):
         return parse_result_envelope(work, source="url", data=combined)
 
     async def _summarize_pages(self, pages: list[CrawlPageResult]) -> list[dict[str, Any]]:
-        system = render_prompt("json_system.jinja2")
+        system = render_prompt("parse_analyst_system.jinja2")
         normalized: list[dict[str, Any]] = []
 
         for page in pages:
@@ -99,7 +99,7 @@ class ParseUrlAgent(BaseAgent):
             data["crawl_success_count"] = crawl_success_count
             return data
 
-        system = render_prompt("json_system.jinja2")
+        system = render_prompt("parse_analyst_system.jinja2")
         user = render_prompt(
             "parse_url_synthesize.jinja2",
             pages_json=compact_pages_for_synthesis(normalized_pages),

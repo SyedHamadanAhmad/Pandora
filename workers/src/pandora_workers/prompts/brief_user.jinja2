@@ -26,3 +26,5 @@ Return a **single JSON object** with **exactly** these keys (no others):
 - `component_list` (array of strings): **at most 15** unique UI building blocks (e.g. `Button`, `Card`, `Navigation`, `Hero`). Prefer URL `component_candidates` when present; merge with text-derived needs; use TitleCase names without duplicates.
 
 Use `null` for any object key only if truly unknowable; prefer sensible defaults over null for `spacing_system`.
+
+{% include 'design_quality_contract.jinja2' %}

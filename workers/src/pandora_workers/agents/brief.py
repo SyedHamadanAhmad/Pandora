@@ -190,7 +190,7 @@ class BriefAgent(BaseAgent):
         gaps = list(work_payload.input_gaps)
         heuristic = _heuristic_defaults(work_payload.sources)
 
-        system = render_prompt("json_system.jinja2")
+        system = render_prompt("design_system_lead_system.jinja2")
         user = render_prompt(
             "brief_user.jinja2",
             sources_json=_sources_json_for_prompt(work_payload.sources),

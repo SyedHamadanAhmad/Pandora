@@ -170,7 +170,7 @@ class SchemaAgent(BaseAgent):
         SchemaRequestWorkPayload.model_validate(work.payload)
         brief_dict: dict[str, Any] = dict(work.payload)
 
-        system = render_prompt("json_system.jinja2")
+        system = render_prompt("design_system_lead_system.jinja2")
         user = render_prompt(
             "schema_user.jinja2",
             brief_json=_brief_json_for_prompt(brief_dict),

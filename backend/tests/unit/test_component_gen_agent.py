@@ -19,6 +19,7 @@ from pandora_workers.agents.component_gen import (  # noqa: E402
     _fallback_component,
     _merge_llm_component,
     _safe_component_name,
+    _spec_type,
 )
 
 
@@ -28,20 +29,35 @@ class ComponentGenHelperTests(unittest.TestCase):
 
     def test_fallback_includes_variants(self) -> None:
         out = _fallback_component(
-            {"name": "Button", "variants": ["primary", "secondary"]},
+            {"name": "Button", "type": "button", "variants": ["primary", "secondary"]},
             design_tokens={"primary": "#111"},
         )
         payload = ComponentGeneratedPayload.model_validate(out)
         self.assertIn("primary", payload.variants)
         self.assertIn("Button", payload.tsx_code)
+        self.assertIn("<button", payload.tsx_code)
+
+    def test_fallback_card_uses_article_not_button_root(self) -> None:
+        out = _fallback_component(
+            {"name": "Card", "type": "card", "variants": ["default"]},
+            design_tokens={"primary": "#111"},
+        )
+        payload = ComponentGeneratedPayload.model_validate(out)
+        self.assertIn("<article", payload.tsx_code)
+        self.assertNotIn("<button", payload.tsx_code)
+
+    def test_spec_type_from_name(self) -> None:
+        self.assertEqual(_spec_type({"name": "PrimaryNav"}), "navigation")
 
     def test_merge_requires_tsx(self) -> None:
         merged = _merge_llm_component(
             {"tsx_code": "", "variants": ["default"]},
-            spec={"name": "Card"},
+            spec={"name": "Card", "type": "card"},
             design_tokens=None,
+            global_config=None,
         )
         self.assertIn("Card", merged["tsx_code"])
+        self.assertIn("<article", merged["tsx_code"])
 
 
 class ComponentGenAgentTests(unittest.IsolatedAsyncioTestCase):
@@ -67,10 +83,16 @@ class ComponentGenAgentTests(unittest.IsolatedAsyncioTestCase):
             "props": {"label": "OK"},
             "variants": ["primary"],
         }
-        with patch(
-            "pandora_workers.agents.component_gen.complete_json",
-            new_callable=AsyncMock,
-            return_value=llm_out,
+        with (
+            patch(
+                "pandora_workers.agents.component_gen.complete_json",
+                new_callable=AsyncMock,
+                return_value=llm_out,
+            ),
+            patch(
+                "pandora_workers.agents.component_gen.render_prompt",
+                side_effect=lambda name, **kwargs: name,
+            ),
         ):
             result = await agent.handle_work(work)
 
@@ -88,14 +110,21 @@ class ComponentGenAgentTests(unittest.IsolatedAsyncioTestCase):
             component_id=7,
             payload={"spec": {"name": "Card", "variants": ["default"]}},
         )
-        with patch(
-            "pandora_workers.agents.component_gen.complete_json",
-            new_callable=AsyncMock,
-            side_effect=RuntimeError("down"),
+        with (
+            patch(
+                "pandora_workers.agents.component_gen.complete_json",
+                new_callable=AsyncMock,
+                side_effect=RuntimeError("down"),
+            ),
+            patch(
+                "pandora_workers.agents.component_gen.render_prompt",
+                side_effect=lambda name, **kwargs: name,
+            ),
         ):
             result = await agent.handle_work(work)
         data = ComponentGeneratedPayload.model_validate(result.payload)
         self.assertIn("Card", data.tsx_code)
+        self.assertIn("<article", data.tsx_code)
 
     async def test_missing_component_id_raises(self) -> None:
         agent = ComponentGenAgent()
