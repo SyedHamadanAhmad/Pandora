@@ -43,6 +43,15 @@ class IdempotencyKeyTests(unittest.TestCase):
             ),
         )
 
+    def test_verification_start_key_includes_revision_round(self) -> None:
+        pipeline_id = uuid4()
+        key = build_idempotency_key(
+            pipeline_id,
+            "pandora.verification.start",
+            attempt=Attempt(revision_round=2),
+        )
+        self.assertEqual(key, f"{pipeline_id}:pandora.verification.start:0.2")
+
     def test_parse_results_key_includes_source(self) -> None:
         pipeline_id = uuid4()
         key = parse_results_idempotency_key(pipeline_id, "text")

@@ -24,7 +24,7 @@ Review consistency across components (tokens, tone, naming, accessibility hints)
 
 Do **not** auto-approve. Return **P2** if any validated component ignores `design_tokens` (e.g. primary color absent from CSS) or omits a spec variant. Return **P1** only for broken accessibility or a non-functional core variant. Use P3 for minor polish only.
 
-Check explicitly: token consistency across components, variant coverage vs each component's `spec.variants`, and naming alignment with the brief.
+Check explicitly: token consistency across components, variant coverage vs each component's `spec.variants`, naming alignment with the brief, and **contrast** (no dark `#000`/`#334155`/`var(--text)` on `var(--primary)` or primary hex backgrounds — use `var(--on-primary)`).
 
 Do not include keys other than `issues` and `approved`.
 

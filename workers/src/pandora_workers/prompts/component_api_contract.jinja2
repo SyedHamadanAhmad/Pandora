@@ -1,13 +1,14 @@
 ## Component API contract (type: {{ spec_type }})
 
-{% for rule in api_contract_rules.split('\n') %}
+{% set rules = api_contract_rules | default('', true) %}
+{% for rule in rules.split('\n') %}
 {% if rule.strip() %}
 - {{ rule.strip() }}
 {% endif %}
 {% endfor %}
 
-**Required props in `{{ component_name }}Props`:** {{ required_props_list }}
-**Optional props:** {{ optional_props_list }}
+**Required props in `{{ component_name }}Props`:** {{ required_props_list | default('(see spec)', true) }}
+**Optional props:** {{ optional_props_list | default('(none)', true) }}
 
 **`props` JSON:** Must include every required field with non-empty demo values.
 **`tsx_code`:** Required props must not use `?` in the Props type. Button uses `{label}` + `onClick`; Card uses `{title}`; Badge uses `{text}`.

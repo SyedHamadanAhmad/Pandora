@@ -34,6 +34,7 @@ You are generating **one React component** for a design-system POC.
 - Label-only API: required `label: string` and `onClick?: () => void` — do not use `children`.
 - Render `<button type="button" onClick={onClick}>{label}</button>`.
 - Variants must differ using design tokens; include hover, focus-visible, disabled in CSS.
+- Primary/solid fills: `background: var(--primary)` with `color: var(--on-primary)` (from design_tokens). Never dark text on primary-colored backgrounds.
 {% elif spec_type == 'card' %}
 - Root: `<article>` with header + body; border/shadow from tokens.
 {% elif spec_type == 'badge' %}
@@ -50,7 +51,7 @@ You are generating **one React component** for a design-system POC.
 - Semantic HTML for type "{{ spec_type }}" and {{ component_name }}.
 {% endif %}
 
-{% include 'component_api_contract.jinja2' %}
+{% include 'component_api_contract.jinja2' with context %}
 
 {% include 'design_quality_contract.jinja2' %}
 

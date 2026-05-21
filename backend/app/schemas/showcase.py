@@ -11,6 +11,8 @@ class ShowcaseSceneResponse(OrmResponseModel):
     scene_tsx_code: str | None
     scene_css_code: str | None
     components_used: list[Any] | None
+    variant_selections: dict[str, Any] | None = None
+    showcase_bundle: dict[str, Any] | None = None
     created_at: datetime
 
 

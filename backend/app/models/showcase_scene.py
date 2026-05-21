@@ -23,6 +23,8 @@ class ShowcaseScene(Base):
     scene_tsx_code: Mapped[str | None] = mapped_column(Text, nullable=True)
     scene_css_code: Mapped[str | None] = mapped_column(Text, nullable=True)
     components_used: Mapped[list[Any] | None] = mapped_column(JSONB, nullable=True)
+    variant_selections: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    showcase_bundle: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

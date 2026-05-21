@@ -8,6 +8,7 @@ import re
 from collections.abc import Callable
 from typing import Any
 
+from pandora_shared.design_color import contrasting_foreground
 from pandora_shared.events import MessageEnvelope, PipelineEvent
 from pandora_shared.payloads import (
     ComponentGenerateWorkPayload,
@@ -92,6 +93,14 @@ def _primary_color(design_tokens: dict[str, Any] | None) -> str:
     return _DEFAULT_PRIMARY
 
 
+def _on_primary_color(design_tokens: dict[str, Any] | None) -> str:
+    if isinstance(design_tokens, dict):
+        raw = design_tokens.get("on_primary")
+        if isinstance(raw, str) and raw.strip():
+            return raw.strip()
+    return contrasting_foreground(_primary_color(design_tokens))
+
+
 def _normalize_variants(spec: dict[str, Any], llm: dict[str, Any]) -> list[str]:
     variants = llm.get("variants")
     if isinstance(variants, list):
@@ -120,6 +129,7 @@ def _fallback_button(
 ) -> dict[str, Any]:
     lower = name.lower()
     primary = _primary_color(design_tokens)
+    on_primary = _on_primary_color(design_tokens)
     unit = _spacing_unit_px(design_tokens, global_config)
     pad_v = unit * 2
     pad_h = unit * 4
@@ -156,8 +166,8 @@ def _fallback_button(
         "css_code": (
             f".pandora-{lower} {{\n"
             f"  padding: {pad_v}px {pad_h}px;\n"
-            f"  background: {primary};\n"
-            f"  color: #fff;\n"
+            f"  background: var(--primary, {primary});\n"
+            f"  color: var(--on-primary, {on_primary});\n"
             f"  border: none;\n"
             f"  border-radius: {unit}px;\n"
             f"  cursor: pointer;\n"
@@ -245,6 +255,7 @@ def _fallback_badge(
 ) -> dict[str, Any]:
     lower = name.lower()
     primary = _primary_color(design_tokens)
+    on_primary = _on_primary_color(design_tokens)
     unit = _spacing_unit_px(design_tokens, global_config)
     variants = _normalize_variants(spec, {})
     variant_union = _variant_union(variants)
@@ -269,8 +280,8 @@ def _fallback_badge(
             f"  font-size: 12px;\n"
             f"  font-weight: 600;\n"
             f"  border-radius: {unit * 2}px;\n"
-            f"  background: {primary};\n"
-            f"  color: #fff;\n"
+            f"  background: var(--primary, {primary});\n"
+            f"  color: var(--on-primary, {on_primary});\n"
             f"}}\n"
         ),
         "props": {"text": text_default, "variant": variants[0]},
@@ -575,7 +586,9 @@ class ComponentGenAgent(BaseAgent):
             component_name=name,
             component_name_lower=name.lower(),
             spec_type=spec_type,
-            **api_ctx,
+            api_contract_rules=api_ctx["api_contract_rules"],
+            required_props_list=api_ctx["required_props_list"],
+            optional_props_list=api_ctx["optional_props_list"],
         )
 
         merged: dict[str, Any]

@@ -167,6 +167,7 @@ class ShowcaseGenerateWorkPayload(BaseModel):
     design_tokens: dict[str, Any] | None = None
     global_config: dict[str, Any] | None = None
     components: list[dict[str, Any]] = Field(default_factory=list)
+    module_manifest: dict[str, Any] | None = None
 
 
 class ShowcaseScenePayload(BaseModel):
@@ -175,6 +176,8 @@ class ShowcaseScenePayload(BaseModel):
     scene_tsx_code: str | None = None
     scene_css_code: str | None = None
     components_used: list[str] = Field(default_factory=list)
+    variant_selections: dict[str, str] | None = None
+    entry_path: str | None = None
 
 
 class ShowcaseReadyPayload(BaseModel):

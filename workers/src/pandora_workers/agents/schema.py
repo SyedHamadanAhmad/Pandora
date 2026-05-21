@@ -11,6 +11,8 @@ from pandora_shared.events import MessageEnvelope, PipelineEvent
 from pandora_shared.payloads import SchemaReadyPayload, SchemaRequestWorkPayload
 from pandora_shared.queues import SCHEMA_READY, SCHEMA_REQUEST
 
+from pandora_shared.design_color import enrich_semantic_color_tokens
+
 from pandora_workers.base_agent import BaseAgent
 from pandora_workers.envelopes import build_result
 from pandora_workers.llm import complete_json
@@ -135,7 +137,7 @@ def _enrich_design_tokens(brief: dict[str, Any], llm_tokens: dict[str, Any]) -> 
         out["primary"] = colors["primary"]
     if not out.get("primary"):
         out.setdefault("primary", "#2563eb")
-    return out
+    return enrich_semantic_color_tokens(out)
 
 
 def _fallback_schema(work: dict[str, Any]) -> dict[str, Any]:

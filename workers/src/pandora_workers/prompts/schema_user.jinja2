@@ -8,7 +8,7 @@ You are producing a **design schema** (tokens + component specs) for a React des
 
 Return a **single JSON object** with **exactly** these keys:
 
-- `design_tokens` (object): merge `color_tokens` from the brief with `primary`, `radius`, and nested `typography` (echo `typography_scale`) and `spacing` (echo `spacing_system`, default unit 4). Prefer hex colors from the brief when present.
+- `design_tokens` (object): merge `color_tokens` from the brief with `primary`, `on_primary` (readable text on primary — light on dark primaries, dark on light), `radius`, and nested `typography` / `spacing`. Include `text`, `text_muted`, `surface`, `on_surface` when possible. Prefer hex from the brief.
 - `global_config` (object): e.g. `{"theme": "light"|"dark", "design_flavour": "<echo brief>"}` and any layout defaults.
 - `component_specs` (array, **at most 15** entries): one object per component name from `component_list` (in that order when possible). Each object must have:
   - `name` (string, required): PascalCase component name (e.g. `Button`, `Hero`).

@@ -76,8 +76,8 @@ def build_idempotency_key(
     key = f"{pipeline_id}:{event}"
     if component_id is not None:
         key = f"{key}:{component_id}"
-        if attempt is not None:
-            key = f"{key}:{attempt.retry_count}.{attempt.revision_round}"
+    if attempt is not None:
+        key = f"{key}:{attempt.retry_count}.{attempt.revision_round}"
     return key
 
 

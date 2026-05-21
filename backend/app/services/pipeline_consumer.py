@@ -40,6 +40,11 @@ from app.services.pipeline_state import (
 )
 from app.services import sse_service
 from pandora_shared.enums import ComponentStatus, ProjectStatus
+from pandora_shared.showcase_bundle import (
+    build_module_manifest,
+    build_showcase_bundle,
+    components_for_bundle_from_db,
+)
 from pandora_shared.events import (
     Attempt,
     MessageEnvelope,
@@ -396,7 +401,12 @@ async def _handle_verification_complete(
             return
 
         state = get_state(envelope.pipeline_id)
-        key = idempotency_key_for_envelope(envelope)
+        verification_pass = state.revision_round
+        key = build_idempotency_key(
+            envelope.pipeline_id,
+            envelope.event,
+            attempt=Attempt(revision_round=verification_pass),
+        )
         payload = envelope.payload
         issues = payload.get("issues") or []
         has_blocking = any(issue.get("priority") in ("P1", "P2") for issue in issues)
@@ -560,7 +570,11 @@ async def _ensure_verification_if_gate_open(
 
 async def _start_verification(state: PipelineState, broker: MessageBroker) -> None:
     """Slice E — publish verification work once all components are resolved."""
-    key = build_idempotency_key(state.pipeline_id, VERIFICATION_START_EVENT)
+    key = build_idempotency_key(
+        state.pipeline_id,
+        VERIFICATION_START_EVENT,
+        attempt=Attempt(revision_round=state.revision_round),
+    )
     work_payload: dict[str, Any] = {}
     async with async_session() as db:
         status, _ = await run_idempotent(
@@ -823,19 +837,24 @@ async def _build_showcase_work_payload(
     components = result.scalars().all()
     library: list[dict[str, Any]] = []
     for component in components:
+        spec = _spec_for_component(schema, component.spec_index)
         library.append(
             {
                 "id": component.id,
                 "name": component.name,
+                "type": spec.get("type"),
                 "tsx_code": _truncate_text(component.tsx_code, limit=4000),
                 "css_code": _truncate_text(component.css_code, limit=2000),
                 "variants": component.variants,
+                "props": component.props,
             }
         )
+    manifest = build_module_manifest(library)
     return {
         "design_tokens": schema.design_tokens if schema else {},
         "global_config": schema.global_config if schema else {},
         "components": library,
+        "module_manifest": manifest,
     }
 
 
@@ -939,16 +958,41 @@ async def _apply_showcase_ready(
     session: AsyncSession,
     envelope: MessageEnvelope,
 ) -> None:
+    schema = await _latest_schema_for_project(session, envelope.project_id)
+    result = await session.execute(
+        select(Component)
+        .where(
+            Component.project_id == envelope.project_id,
+            Component.status == ComponentStatus.validated,
+        )
+        .order_by(Component.spec_index.asc())
+    )
+    component_rows = result.scalars().all()
+    bundle_components = components_for_bundle_from_db(component_rows)
+    design_tokens = schema.design_tokens if schema and schema.design_tokens else {}
+
     scenes = envelope.payload.get("scenes") or []
     for scene in scenes:
+        scene_tsx = scene.get("scene_tsx_code") or ""
+        scene_css = scene.get("scene_css_code")
+        scene_index = int(scene.get("scene_index", 0))
+        showcase_bundle = build_showcase_bundle(
+            design_tokens=design_tokens,
+            components=bundle_components,
+            scene_tsx=scene_tsx,
+            scene_css=scene_css if isinstance(scene_css, str) else None,
+            scene_index=scene_index,
+        )
         session.add(
             ShowcaseScene(
                 project_id=envelope.project_id,
-                scene_index=scene.get("scene_index", 0),
+                scene_index=scene_index,
                 scene_name=scene.get("scene_name"),
-                scene_tsx_code=scene.get("scene_tsx_code"),
-                scene_css_code=scene.get("scene_css_code"),
+                scene_tsx_code=scene_tsx,
+                scene_css_code=scene_css,
                 components_used=scene.get("components_used"),
+                variant_selections=scene.get("variant_selections"),
+                showcase_bundle=showcase_bundle,
             )
         )
 

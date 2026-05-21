@@ -13,6 +13,8 @@ from pandora_shared.payloads import (
 )
 from pandora_shared.queues import VERIFICATION_COMPLETE, VERIFICATION_START
 
+from pandora_shared.design_color import css_primary_background_with_dark_text
+
 from pandora_workers.base_agent import BaseAgent
 from pandora_workers.envelopes import build_result
 from pandora_workers.llm import complete_json
@@ -121,6 +123,18 @@ def _deterministic_issues(work: dict[str, Any]) -> list[dict[str, Any]]:
                             ),
                         }
                     )
+
+        if css_primary_background_with_dark_text(styles):
+            issues.append(
+                {
+                    "priority": "P2",
+                    "component_id": component_id,
+                    "message": (
+                        "Use var(--on-primary) for text on primary backgrounds; "
+                        "dark text on primary/orange fails contrast."
+                    ),
+                }
+            )
 
     return issues[:_MAX_ISSUES]
 

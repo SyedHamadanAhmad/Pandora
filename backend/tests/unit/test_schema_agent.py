@@ -43,6 +43,10 @@ class SchemaEnrichTests(unittest.TestCase):
         self.assertEqual(out["spacing"]["unit"], 8)
         self.assertEqual(out["radius"], "4px")
 
+    def test_enrich_adds_on_primary_for_orange(self) -> None:
+        out = _enrich_design_tokens({"color_tokens": {"primary": "#f97316"}}, {})
+        self.assertEqual(out["on_primary"], "#ffffff")
+
     def test_merge_includes_typography_from_brief(self) -> None:
         work = {
             "color_tokens": {"primary": "#000"},

@@ -3,5 +3,5 @@ Design Quality Contract (mandatory):
 2. Typography: Use fontFamily and scale from design_tokens / typography_scale; minimum body 14px; clear heading hierarchy.
 3. Spacing: Use spacing_system.unit multiples (4px grid default) for padding, margin, and gap.
 4. Components: PascalCase exports; typed props; variants must change visual state (not label text alone).
-5. Accessibility: Focus-visible ring on interactive elements; contrast ratio at least 4.5:1 for primary text on backgrounds.
+5. Accessibility: Focus-visible ring on interactive elements; contrast ratio at least 4.5:1 for text on backgrounds. On primary/accent fills use `color: var(--on-primary)` or `var(--on-accent)` — never body `var(--text)` or `#000`/`#334155` on `var(--primary)` backgrounds.
 6. Scope: No external UI libraries; import react only when needed; className prefix pandora-{componentname} (lowercase component name).

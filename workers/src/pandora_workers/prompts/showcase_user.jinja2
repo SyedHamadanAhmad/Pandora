@@ -1,4 +1,4 @@
-You are building a **motion showcase** that composes validated React components into 1–3 demo scenes.
+You are building **1–3 showcase scenes** that stage validated design-system components into coherent product demos.
 
 ## Design tokens (JSON)
 
@@ -8,9 +8,19 @@ You are building a **motion showcase** that composes validated React components 
 
 {{ global_config_json }}
 
-## Validated components (JSON)
+## Module manifest (import contract — required)
 
-Each entry has `name`, `tsx_code`, and optional `css_code`. Reference these components in scene layout (import or inline composition as appropriate).
+Only import from these paths. Do not invent components or paths.
+
+{{ module_manifest_json }}
+
+Each module entry has:
+- `path` (e.g. `/Button.tsx`)
+- `export` (PascalCase name)
+- `variants` (allowed variant strings)
+- `props_defaults` (demo props — use as a baseline; adjust per scene)
+
+## Component previews (truncated TSX for context)
 
 {{ components_json }}
 
@@ -18,13 +28,22 @@ Each entry has `name`, `tsx_code`, and optional `css_code`. Reference these comp
 
 Return a **single JSON object** with one key:
 
-- `scenes` (array, 1–3 items): each object must have:
-  - `scene_index` (integer, 0-based order)
-  - `scene_name` (string): short title e.g. "Hero", "Components"
-  - `scene_tsx_code` (string): React TSX using motion-friendly markup (e.g. `motion.div` class names are fine; keep self-contained)
-  - `scene_css_code` (string or null): scene-level CSS
-  - `components_used` (array of strings): component **names** featured in the scene
+- `scenes` (array, 1–3 items). Each scene object:
 
-Keep scenes concise and demonstrative. Do not include keys other than `scenes`.
+  - `scene_index` (integer, 0-based)
+  - `scene_name` (string): short title, e.g. "Marketing hero", "Dashboard"
+  - `scene_tsx_code` (string): **full** `/Showcase.tsx` source that:
+    - Imports only from `./{ExportName}` listed in the manifest
+    - Exports `export default function Showcase()` (or `export function Showcase`)
+    - Picks **one variant per used component** that fits the scene story (not a generic matrix)
+    - Uses correct API props (`label` for Button, `title` for Card, `text` for Badge, etc.)
+    - Includes `onClick={() => {}}` on Button when used
+  - `scene_css_code` (string or null): layout/spacing for this scene only (uses token variables where possible)
+  - `components_used` (array of strings): manifest module names featured
+  - `variant_selections` (object, optional): map component name → chosen variant, e.g. `{"Button": "primary", "Card": "default"}`
+
+Do **not** redefine component implementations in `scene_tsx_code` — only compose imports.
+
+Do not include keys other than `scenes`.
 
 {% include 'design_quality_contract.jinja2' %}
