@@ -16,6 +16,7 @@ from pandora_shared.events import MessageEnvelope, PipelineEvent  # noqa: E402
 from pandora_shared.payloads import SchemaReadyPayload  # noqa: E402
 from pandora_workers.agents.schema import (  # noqa: E402
     SchemaAgent,
+    _enrich_design_tokens,
     _fallback_schema,
     _merge_llm_schema,
     _normalize_spec,
@@ -29,6 +30,37 @@ class SchemaNormalizeTests(unittest.TestCase):
         self.assertEqual(s["variants"], ["a", "b"])
 
 
+class SchemaEnrichTests(unittest.TestCase):
+    def test_enrich_merges_typography_and_spacing(self) -> None:
+        brief = {
+            "color_tokens": {"primary": "#111"},
+            "typography_scale": {"base": "16px", "font_sans": "Inter"},
+            "spacing_system": {"unit": 8},
+        }
+        out = _enrich_design_tokens(brief, {"radius": "4px"})
+        self.assertEqual(out["primary"], "#111")
+        self.assertEqual(out["typography"]["font_sans"], "Inter")
+        self.assertEqual(out["spacing"]["unit"], 8)
+        self.assertEqual(out["radius"], "4px")
+
+    def test_merge_includes_typography_from_brief(self) -> None:
+        work = {
+            "color_tokens": {"primary": "#000"},
+            "typography_scale": {"base": "18px"},
+            "spacing_system": {"unit": 4},
+            "component_list": ["Button"],
+        }
+        llm = {
+            "design_tokens": {"primary": "#000"},
+            "global_config": {"theme": "light"},
+            "component_specs": [{"name": "Button", "type": "button", "variants": ["primary"]}],
+        }
+        merged = _merge_llm_schema(llm, work=work)
+        self.assertIn("typography", merged["design_tokens"])
+        self.assertIn("spacing", merged["design_tokens"])
+        self.assertIn("brief", merged["global_config"])
+
+
 class SchemaFallbackTests(unittest.TestCase):
     def test_fallback_from_component_list(self) -> None:
         work = {
@@ -40,6 +72,7 @@ class SchemaFallbackTests(unittest.TestCase):
         payload = SchemaReadyPayload.model_validate(out)
         self.assertEqual(len(payload.component_specs), 2)
         self.assertEqual(payload.component_specs[0]["name"], "Button")
+        self.assertIn("spacing", payload.design_tokens)
 
     def test_merge_caps_specs(self) -> None:
         work = {"component_list": ["A"], "color_tokens": {"primary": "#000"}}

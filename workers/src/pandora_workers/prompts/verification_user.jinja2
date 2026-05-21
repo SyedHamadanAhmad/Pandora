@@ -22,7 +22,9 @@ Review consistency across components (tokens, tone, naming, accessibility hints)
   - `message` (string): concise revision instruction for the component agent
 - `approved` (boolean): `true` only if there are **no** P1 or P2 issues
 
-Use P1/P2 sparingly for real blockers (broken contrast, missing core variant, incoherent with brief). Use P3 for minor polish. If all components look acceptable for a POC, return `issues: []` and `approved: true`.
+Do **not** auto-approve. Return **P2** if any validated component ignores `design_tokens` (e.g. primary color absent from CSS) or omits a spec variant. Return **P1** only for broken accessibility or a non-functional core variant. Use P3 for minor polish only.
+
+Check explicitly: token consistency across components, variant coverage vs each component's `spec.variants`, and naming alignment with the brief.
 
 Do not include keys other than `issues` and `approved`.
 

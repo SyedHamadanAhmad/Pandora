@@ -98,11 +98,52 @@ def _normalize_spec(raw: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
+_DEFAULT_SPACING: dict[str, Any] = {"unit": 4}
+
+
+def _brief_snapshot(work: dict[str, Any]) -> dict[str, Any]:
+    """Small brief slice for downstream agents (no full parse blobs)."""
+    keys = (
+        "design_flavour",
+        "tone",
+        "color_tokens",
+        "typography_scale",
+        "spacing_system",
+        "component_list",
+    )
+    return {k: work[k] for k in keys if k in work}
+
+
+def _enrich_design_tokens(brief: dict[str, Any], llm_tokens: dict[str, Any]) -> dict[str, Any]:
+    """Merge brief colors + LLM tokens; always attach typography and spacing (W-03)."""
+    colors = brief.get("color_tokens") if isinstance(brief.get("color_tokens"), dict) else {}
+    typo = brief.get("typography_scale") if isinstance(brief.get("typography_scale"), dict) else {}
+    spacing = (
+        brief.get("spacing_system")
+        if isinstance(brief.get("spacing_system"), dict)
+        else dict(_DEFAULT_SPACING)
+    )
+    out: dict[str, Any] = {**colors, **llm_tokens}
+    if typo:
+        out.setdefault("typography", typo)
+    if spacing:
+        out.setdefault("spacing", spacing)
+    if not out.get("radius"):
+        radius = llm_tokens.get("radius") if isinstance(llm_tokens.get("radius"), str) else None
+        out["radius"] = radius or "8px"
+    if not out.get("primary") and isinstance(colors.get("primary"), str):
+        out["primary"] = colors["primary"]
+    if not out.get("primary"):
+        out.setdefault("primary", "#2563eb")
+    return out
+
+
 def _fallback_schema(work: dict[str, Any]) -> dict[str, Any]:
     colors = work.get("color_tokens") if isinstance(work.get("color_tokens"), dict) else {}
-    design_tokens: dict[str, Any] = {**colors} if colors else {"primary": "#2563eb", "radius": "8px"}
+    base_tokens: dict[str, Any] = {**colors} if colors else {"primary": "#2563eb", "radius": "8px"}
+    design_tokens = _enrich_design_tokens(work, base_tokens)
     flavour = work.get("design_flavour") if isinstance(work.get("design_flavour"), str) else None
-    global_config: dict[str, Any] = {"theme": "light"}
+    global_config: dict[str, Any] = {"theme": "light", "brief": _brief_snapshot(work)}
     if flavour:
         global_config["design_flavour"] = flavour
     names = work.get("component_list")
@@ -131,10 +172,11 @@ def _fallback_schema(work: dict[str, Any]) -> dict[str, Any]:
 
 
 def _merge_llm_schema(llm: dict[str, Any], *, work: dict[str, Any]) -> dict[str, Any]:
-    design_tokens = llm.get("design_tokens")
-    if not isinstance(design_tokens, dict) or not design_tokens:
+    raw_tokens = llm.get("design_tokens")
+    if not isinstance(raw_tokens, dict) or not raw_tokens:
         fb = work.get("color_tokens") if isinstance(work.get("color_tokens"), dict) else {}
-        design_tokens = dict(fb) if fb else {"primary": "#2563eb", "radius": "8px"}
+        raw_tokens = dict(fb) if fb else {"primary": "#2563eb", "radius": "8px"}
+    design_tokens = _enrich_design_tokens(work, raw_tokens)
 
     global_config = llm.get("global_config")
     if not isinstance(global_config, dict):
@@ -144,6 +186,8 @@ def _merge_llm_schema(llm: dict[str, Any], *, work: dict[str, Any]) -> dict[str,
         global_config = {**global_config, "design_flavour": flavour.strip()}
     if "theme" not in global_config:
         global_config = {**global_config, "theme": "light"}
+    if "brief" not in global_config:
+        global_config = {**global_config, "brief": _brief_snapshot(work)}
 
     raw_specs = llm.get("component_specs")
     normalized: list[dict[str, Any]] = []

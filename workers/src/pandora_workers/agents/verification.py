@@ -52,6 +52,79 @@ def _normalize_issue(raw: dict[str, Any]) -> dict[str, Any] | None:
     return out
 
 
+def _component_css_and_tsx(comp: dict[str, Any]) -> str:
+    return (comp.get("css_preview") or "") + (comp.get("tsx_preview") or "")
+
+
+def _token_used_in_styles(token_value: str, styles: str) -> bool:
+    """True if primary (or other) token appears in generated CSS/TSX."""
+    if token_value in styles:
+        return True
+    normalized = token_value.strip().lower()
+    if normalized and normalized in styles.lower():
+        return True
+    if token_value.startswith("#") and len(token_value) >= 4:
+        var_name = f"--primary"
+        if var_name in styles:
+            return True
+    return False
+
+
+def _deterministic_issues(work: dict[str, Any]) -> list[dict[str, Any]]:
+    """Pre-LLM lint: token drift and missing spec variants (W-04)."""
+    issues: list[dict[str, Any]] = []
+    tokens = work.get("design_tokens") if isinstance(work.get("design_tokens"), dict) else {}
+    primary = tokens.get("primary")
+
+    for comp in work.get("components") or []:
+        if not isinstance(comp, dict):
+            continue
+        if comp.get("status") != "validated":
+            continue
+        cid = comp.get("id")
+        if cid is None:
+            continue
+        try:
+            component_id = int(cid)
+        except (TypeError, ValueError):
+            continue
+
+        styles = _component_css_and_tsx(comp)
+        if primary and isinstance(primary, str) and primary.strip():
+            if not _token_used_in_styles(primary.strip(), styles):
+                issues.append(
+                    {
+                        "priority": "P2",
+                        "component_id": component_id,
+                        "message": (
+                            f"Use design token primary ({primary}) in styles; "
+                            "avoid unrelated palette."
+                        ),
+                    }
+                )
+
+        spec = comp.get("spec") if isinstance(comp.get("spec"), dict) else {}
+        variants = spec.get("variants")
+        if isinstance(variants, list) and len(variants) > 1:
+            for variant in variants:
+                if not isinstance(variant, str) or not variant.strip():
+                    continue
+                v = variant.strip()
+                if v not in styles and f"--{v}" not in styles:
+                    issues.append(
+                        {
+                            "priority": "P2",
+                            "component_id": component_id,
+                            "message": (
+                                f"Variant `{v}` from spec must appear in CSS "
+                                "(class modifier or token hook)."
+                            ),
+                        }
+                    )
+
+    return issues[:_MAX_ISSUES]
+
+
 def _issues_from_failed_components(work: dict[str, Any]) -> list[dict[str, Any]]:
     """Non-blocking notes for components that failed validation."""
     out: list[dict[str, Any]] = []
@@ -74,21 +147,37 @@ def _issues_from_failed_components(work: dict[str, Any]) -> list[dict[str, Any]]
     return out
 
 
+def _append_unique_issues(
+    issues: list[dict[str, Any]],
+    candidates: list[dict[str, Any]],
+) -> None:
+    seen = {(i.get("component_id"), i.get("message")) for i in issues}
+    for item in candidates:
+        key = (item.get("component_id"), item.get("message"))
+        if key in seen:
+            continue
+        issues.append(item)
+        seen.add(key)
+        if len(issues) >= _MAX_ISSUES:
+            break
+
+
 def _merge_verification(
     llm: dict[str, Any],
     *,
     work: dict[str, Any],
 ) -> dict[str, Any]:
-    issues: list[dict[str, Any]] = []
+    issues: list[dict[str, Any]] = list(_deterministic_issues(work))
+
     raw_issues = llm.get("issues")
+    llm_normalized: list[dict[str, Any]] = []
     if isinstance(raw_issues, list):
         for item in raw_issues:
             if isinstance(item, dict):
                 normalized = _normalize_issue(item)
                 if normalized:
-                    issues.append(normalized)
-            if len(issues) >= _MAX_ISSUES:
-                break
+                    llm_normalized.append(normalized)
+    _append_unique_issues(issues, llm_normalized)
 
     existing_ids = {i.get("component_id") for i in issues if i.get("component_id") is not None}
     for extra in _issues_from_failed_components(work):
@@ -117,11 +206,21 @@ def _merge_verification(
 
 
 def _fallback_pass(work: dict[str, Any]) -> dict[str, Any]:
-    issues = _issues_from_failed_components(work)
+    """Fail closed on LLM failure: keep deterministic P2 issues (W-04)."""
+    issues: list[dict[str, Any]] = list(_deterministic_issues(work))
+    _append_unique_issues(issues, _issues_from_failed_components(work))
+    blocking = [i for i in issues if i.get("priority") in _BLOCKING and i.get("component_id") is not None]
+    revisions = [
+        {
+            "component_id": i["component_id"],
+            "revision_instruction": i["message"],
+        }
+        for i in blocking
+    ]
     return {
         "issues": issues,
         "approved": not any(i.get("priority") in _BLOCKING for i in issues),
-        "revisions": [],
+        "revisions": revisions,
     }
 
 
