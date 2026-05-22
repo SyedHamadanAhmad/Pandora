@@ -24,7 +24,7 @@ from app.services.design_data import (
     spec_for_component,
     truncate_text,
 )
-from app.services.storybook_tokens import enriched_design_tokens
+from app.services.storybook_tokens import design_tokens_for_api, enriched_design_tokens
 from pandora_shared.enums import ComponentStatus
 from pandora_shared.token_schema import storybook_token_schema
 
@@ -75,7 +75,9 @@ async def build_storybook_overview(
 ) -> StorybookOverviewResponse:
     schema = await latest_schema_for_project(session, project.id)
     components = await components_for_project(session, project.id)
-    design_tokens = enriched_design_tokens(schema.design_tokens if schema else None)
+    design_tokens = design_tokens_for_api(
+        enriched_design_tokens(schema.design_tokens if schema else None)
+    )
     global_config = dict(schema.global_config) if schema and schema.global_config else {}
     specs_raw = list(schema.component_specs) if schema and schema.component_specs else []
 
@@ -132,6 +134,6 @@ async def build_component_detail(
         project_id=project.id,
         component=ComponentResponse.model_validate(component),
         spec=spec_for_component(schema, component.spec_index),
-        design_tokens=enriched_design_tokens(schema.design_tokens),
+        design_tokens=design_tokens_for_api(enriched_design_tokens(schema.design_tokens)),
         global_config=dict(schema.global_config) if schema.global_config else {},
     )

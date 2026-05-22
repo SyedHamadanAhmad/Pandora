@@ -53,8 +53,18 @@ def build_component_generate_envelope(
     global_config: dict[str, Any] | None,
     revision_instruction: str | None,
     revision_round: int,
+    storybook_ad_hoc: bool = True,
 ) -> MessageEnvelope:
     spec = spec_for_component(schema, component.spec_index)
+    payload: dict[str, Any] = {
+        "spec": spec,
+        "spec_index": component.spec_index,
+        "design_tokens": design_tokens,
+        "global_config": global_config,
+        "revision_instruction": revision_instruction,
+    }
+    if storybook_ad_hoc:
+        payload["storybook_ad_hoc"] = True
     return MessageEnvelope(
         event=COMPONENT_GENERATE_EVENT,
         project_id=project_id,
@@ -64,14 +74,7 @@ def build_component_generate_envelope(
             retry_count=component.retry_count,
             revision_round=revision_round,
         ),
-        payload={
-            "spec": spec,
-            "spec_index": component.spec_index,
-            "design_tokens": design_tokens,
-            "global_config": global_config,
-            "revision_instruction": revision_instruction,
-            "storybook_ad_hoc": True,
-        },
+        payload=payload,
     )
 
 

@@ -43,6 +43,21 @@ class BuildEnvelopeTests(unittest.TestCase):
         self.assertEqual(envelope.payload["spec"]["name"], "Button")
         self.assertTrue(envelope.payload["storybook_ad_hoc"])
 
+    def test_holism_envelope_omits_storybook_ad_hoc(self) -> None:
+        pipeline_id = uuid4()
+        envelope = build_component_generate_envelope(
+            project_id=1,
+            pipeline_id=pipeline_id,
+            component=_Component(),  # type: ignore[arg-type]
+            schema=_Schema(),  # type: ignore[arg-type]
+            design_tokens={},
+            global_config={},
+            revision_instruction="fix",
+            revision_round=1,
+            storybook_ad_hoc=False,
+        )
+        self.assertNotIn("storybook_ad_hoc", envelope.payload)
+
 
 if __name__ == "__main__":
     unittest.main()

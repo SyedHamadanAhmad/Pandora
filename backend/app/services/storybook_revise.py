@@ -17,6 +17,7 @@ from app.services.storybook_publish import (
 from app.services.storybook_tokens import assert_storybook_idle, require_design_schema
 from pandora_shared.enums import ComponentStatus
 from pandora_shared.queues import COMPONENT_GENERATE
+from pandora_shared.sse_events import COMPONENT_REVISION_STARTED
 
 _MAX_REVISE_MESSAGE_LEN = 4096
 
@@ -83,7 +84,7 @@ async def revise_component(
     sse_service.emit(
         project.id,
         {
-            "type": "component_revision_started",
+            "type": COMPONENT_REVISION_STARTED,
             "projectId": project.id,
             "componentId": str(component.id),
             "componentName": component.name,

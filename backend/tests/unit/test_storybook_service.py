@@ -6,7 +6,7 @@ import unittest
 
 from app.schemas.storybook import StorybookSummary
 from app.services.storybook_service import _summary_counts
-from app.services.storybook_tokens import enriched_design_tokens
+from app.services.storybook_tokens import design_tokens_for_api, enriched_design_tokens
 from pandora_shared.enums import ComponentStatus
 
 
@@ -20,6 +20,11 @@ class StorybookServiceTests(unittest.TestCase):
         tokens = enriched_design_tokens({"primary": "#f97316"})
         self.assertEqual(tokens["on_primary"], "#ffffff")
         self.assertIn("surface", tokens)
+
+    def test_design_tokens_for_api_camelizes_keys(self) -> None:
+        api = design_tokens_for_api({"on_primary": "#ffffff", "text_muted": "#64748b"})
+        self.assertEqual(api["onPrimary"], "#ffffff")
+        self.assertEqual(api["textMuted"], "#64748b")
 
     def test_summary_counts(self) -> None:
         components = [

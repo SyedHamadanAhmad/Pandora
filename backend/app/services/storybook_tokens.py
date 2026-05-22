@@ -26,6 +26,7 @@ from app.services.storybook_publish import (
 )
 from pandora_shared.design_color import enrich_semantic_color_tokens
 from pandora_shared.enums import ComponentStatus
+from pandora_shared.sse_events import TOKEN_REGENERATION_STARTED
 from pandora_shared.token_schema import EDITABLE_TOKEN_KEYS
 
 _MAX_SUGGEST_MESSAGE_LEN = 4096
@@ -45,6 +46,25 @@ _PROMPT_PATH = Path(__file__).resolve().parent.parent / "prompts" / "token_sugge
 
 def enriched_design_tokens(raw: dict[str, Any] | None) -> dict[str, Any]:
     return enrich_semantic_color_tokens(dict(raw or {}))
+
+
+def _snake_to_camel(key: str) -> str:
+    if "_" not in key:
+        return key
+    parts = key.split("_")
+    return parts[0] + "".join(part.capitalize() for part in parts[1:])
+
+
+def design_tokens_for_api(tokens: dict[str, Any]) -> dict[str, Any]:
+    """CamelCase nested token keys for JSON (e.g. on_primary → onPrimary)."""
+    out: dict[str, Any] = {}
+    for key, value in tokens.items():
+        api_key = _snake_to_camel(key)
+        if isinstance(value, dict):
+            out[api_key] = design_tokens_for_api(value)
+        else:
+            out[api_key] = value
+    return out
 
 
 def _camel_to_snake(key: str) -> str:
@@ -151,7 +171,7 @@ async def patch_design_tokens(
     merged = merge_design_tokens(schema.design_tokens, filtered)
     schema.design_tokens = merged
     await session.commit()
-    return TokenPatchResponse(design_tokens=merged)
+    return TokenPatchResponse(design_tokens=design_tokens_for_api(merged))
 
 
 def _token_suggest_system_prompt() -> str:
@@ -217,8 +237,8 @@ async def suggest_design_tokens(
     if not isinstance(explanation, str):
         explanation = "Updated tokens per your request."
     return SuggestTokensResponse(
-        proposed_tokens=proposed,
-        design_tokens=merged,
+        proposed_tokens=design_tokens_for_api(proposed),
+        design_tokens=design_tokens_for_api(merged),
         explanation=explanation.strip(),
     )
 
@@ -251,7 +271,7 @@ async def apply_design_tokens(
         sse_service.emit(
             project.id,
             {
-                "type": "token_regeneration_started",
+                "type": TOKEN_REGENERATION_STARTED,
                 "projectId": project.id,
                 "total": queued,
             },
@@ -261,7 +281,7 @@ async def apply_design_tokens(
 
     status_label = "token_apply_running" if regenerate_components and queued > 0 else "applied"
     return ApplyTokensResponse(
-        design_tokens=merged,
+        design_tokens=design_tokens_for_api(merged),
         regenerate_queued=queued,
         status=status_label,
     )

@@ -28,6 +28,7 @@ from app.services.idempotency import (
     run_idempotent,
 )
 from app.services.message_broker import MessageBroker, decode_envelope
+from app.services.storybook_publish import build_component_generate_envelope
 from app.services.pipeline_state import (
     OnParsesComplete,
     PipelineState,
@@ -39,6 +40,11 @@ from app.services.pipeline_state import (
 )
 from app.services import sse_service
 from pandora_shared.enums import ComponentStatus, ProjectStatus
+from pandora_shared.sse_events import (
+    PIPELINE_COMPLETE,
+    REVISION_RUNNING,
+    VERIFICATION_RUNNING,
+)
 from pandora_shared.showcase_bundle import (
     build_module_manifest,
     build_showcase_bundle,
@@ -443,7 +449,7 @@ async def _handle_verification_complete(
             _emit_project_event(
                 envelope.project_id,
                 {
-                    "type": "revision_running",
+                    "type": REVISION_RUNNING,
                     "projectId": envelope.project_id,
                     "pipelineId": str(envelope.pipeline_id),
                     "revisionRound": state.revision_round,
@@ -522,7 +528,7 @@ async def _handle_showcase_ready(
         _emit_project_event(
             envelope.project_id,
             {
-                "type": "pipeline_complete",
+                "type": PIPELINE_COMPLETE,
                 "projectId": envelope.project_id,
                 "pipelineId": str(envelope.pipeline_id),
             },
@@ -610,7 +616,7 @@ async def _start_verification(state: PipelineState, broker: MessageBroker) -> No
     _emit_project_event(
         state.project_id,
         {
-            "type": "verification_running",
+            "type": VERIFICATION_RUNNING,
             "projectId": state.project_id,
             "pipelineId": str(state.pipeline_id),
         },
@@ -940,25 +946,21 @@ async def _fanout_revision_generates(
     state.expected_components = len(components)
     state.resolved_components = 0
 
+    if schema is None:
+        return
+
     for component in components:
-        spec = _spec_for_component(schema, component.spec_index)
         component.status = ComponentStatus.generating
-        work = MessageEnvelope(
-            event=COMPONENT_GENERATE_EVENT,
+        work = build_component_generate_envelope(
             project_id=envelope.project_id,
             pipeline_id=envelope.pipeline_id,
-            component_id=component.id,
-            attempt=Attempt(
-                retry_count=component.retry_count,
-                revision_round=revision_round,
-            ),
-            payload={
-                "spec": spec,
-                "spec_index": component.spec_index,
-                "design_tokens": schema.design_tokens if schema else None,
-                "global_config": schema.global_config if schema else None,
-                "revision_instruction": component.revision_instruction,
-            },
+            component=component,
+            schema=schema,
+            design_tokens=schema.design_tokens,
+            global_config=schema.global_config,
+            revision_instruction=component.revision_instruction,
+            revision_round=revision_round,
+            storybook_ad_hoc=False,
         )
         await broker.publish(COMPONENT_GENERATE, work)
 

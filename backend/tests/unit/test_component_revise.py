@@ -84,7 +84,9 @@ class ReviseComponentServiceTests(unittest.IsolatedAsyncioTestCase):
         broker.publish.assert_awaited_once()
         session.commit.assert_awaited_once()
         emit_sse.assert_called_once()
-        self.assertEqual(emit_sse.call_args[0][1]["type"], "component_revision_started")
+        from pandora_shared.sse_events import COMPONENT_REVISION_STARTED
+
+        self.assertEqual(emit_sse.call_args[0][1]["type"], COMPONENT_REVISION_STARTED)
 
     async def test_revise_rejects_when_component_generating(self) -> None:
         component = _FakeComponent(status=ComponentStatus.generating)
