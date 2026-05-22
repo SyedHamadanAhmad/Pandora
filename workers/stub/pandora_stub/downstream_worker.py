@@ -1,4 +1,4 @@
-"""Stub downstream agents — brief, schema, component, verification, showcase."""
+"""Stub downstream agents — brief, schema, component, verification."""
 
 from __future__ import annotations
 
@@ -15,8 +15,6 @@ from pandora_shared.queues import (
     COMPONENT_VALIDATED,
     SCHEMA_READY,
     SCHEMA_REQUEST,
-    SHOWCASE_GENERATE,
-    SHOWCASE_READY,
     VERIFICATION_COMPLETE,
     VERIFICATION_START,
 )
@@ -33,7 +31,6 @@ from pandora_stub.runtime import (
 logger = __import__("logging").getLogger(__name__)
 
 COMPONENT_GENERATE_EVENT = "pandora.component.generate"
-SHOWCASE_GENERATE_EVENT = "pandora.showcase.generate"
 
 
 def _brief_ready_payload(work: MessageEnvelope) -> dict:
@@ -73,20 +70,6 @@ def _component_validated_payload(work: MessageEnvelope) -> dict:
 
 def _verification_complete_payload(_work: MessageEnvelope) -> dict:
     return {"issues": [], "approved": True}
-
-
-def _showcase_ready_payload(_work: MessageEnvelope) -> dict:
-    return {
-        "scenes": [
-            {
-                "scene_index": 0,
-                "scene_name": "Hero",
-                "scene_tsx_code": "<motion.div className='hero'>Stub showcase</motion.div>",
-                "scene_css_code": ".hero { min-height: 100vh; }",
-                "components_used": ["Button", "Card"],
-            }
-        ]
-    }
 
 
 async def _handle_brief_request(message: AbstractIncomingMessage, channel: AbstractChannel) -> None:
@@ -156,22 +139,6 @@ async def _handle_verification_start(
     logger.info("stub verification.complete project_id=%s", work.project_id)
 
 
-async def _handle_showcase_generate(
-    message: AbstractIncomingMessage,
-    channel: AbstractChannel,
-) -> None:
-    work = decode_envelope(message.body)
-    result = MessageEnvelope(
-        event=PipelineEvent.SHOWCASE_READY,
-        project_id=work.project_id,
-        pipeline_id=work.pipeline_id,
-        payload=_showcase_ready_payload(work),
-    )
-    await publish(channel, SHOWCASE_READY, result)
-    await message.ack()
-    logger.info("stub showcase.ready project_id=%s", work.project_id)
-
-
 def _truthy_env(name: str) -> bool:
     return os.environ.get(name, "").strip().lower() in {"1", "true", "yes", "on"}
 
@@ -199,12 +166,7 @@ async def main() -> None:
             "STUB_SKIP_COMPONENT set — not consuming pandora.component.generate "
             "(use worker-component-gen + worker-feedback)"
         )
-    bindings.extend(
-        [
-            (VERIFICATION_START, _handle_verification_start),
-            (SHOWCASE_GENERATE, _handle_showcase_generate),
-        ]
-    )
+    bindings.append((VERIFICATION_START, _handle_verification_start))
     logger.info(
         "stub downstream worker listening on %s",
         ", ".join(queue for queue, _ in bindings),

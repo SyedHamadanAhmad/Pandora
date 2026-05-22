@@ -13,7 +13,7 @@ from pandora_shared.queues import (
 
 class QueueConstantsTests(unittest.TestCase):
     def test_all_queues_includes_brief_schema_request_and_result(self) -> None:
-        self.assertEqual(len(ALL_QUEUES), 18)
+        self.assertEqual(len(ALL_QUEUES), 16)
         self.assertIn(BRIEF_REQUEST, ALL_QUEUES)
         self.assertIn(BRIEF_READY, ALL_QUEUES)
         self.assertIn(SCHEMA_REQUEST, ALL_QUEUES)

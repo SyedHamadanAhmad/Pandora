@@ -106,13 +106,6 @@ async def test_register_login_project_thread_and_minio(api_client: AsyncClient) 
     assert components.status_code == 200
     assert components.json() == {"components": []}
 
-    showcase = await api_client.get(
-        f"/api/projects/{project_id}/showcase",
-        cookies=login.cookies,
-    )
-    assert showcase.status_code == 200
-    assert showcase.json() == {"scenes": []}
-
     async with async_session() as db:
         row = await db.execute(
             select(ThreadMessage).where(ThreadMessage.id == message_id)

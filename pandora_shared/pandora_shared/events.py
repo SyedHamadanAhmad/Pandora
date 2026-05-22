@@ -27,7 +27,6 @@ class PipelineEvent(StrEnum):
     COMPONENT_VALIDATED = "pandora.component.validated"
     COMPONENT_FAILED = "pandora.component.failed"
     VERIFICATION_COMPLETE = "pandora.verification.complete"
-    SHOWCASE_READY = "pandora.showcase.ready"
 
 
 # Backward-compatible aliases (prefer PipelineEvent in new code)

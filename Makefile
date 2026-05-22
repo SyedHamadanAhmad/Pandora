@@ -33,7 +33,7 @@ dev-agents: dev-phase7-e2e
 dev-parse-e2e: check-env
 	$(COMPOSE_PARSE_E2E) up --build worker-parse-text worker-parse-image worker-parse-url stub-downstream
 
-# Real Brief + Schema workers + stub downstream (component/verify/showcase only).
+# Real Brief + Schema workers + stub downstream (component/verify only).
 # Do not run stub-parse-* with real parse workers.
 dev-phase5-e2e: check-env
 	STUB_SKIP_BRIEF=1 STUB_SKIP_SCHEMA=1 $(COMPOSE_BRIEF_E2E) up --build \
@@ -43,7 +43,7 @@ dev-phase5-e2e: check-env
 down-phase6-e2e:
 	$(COMPOSE_BRIEF_E2E) down --remove-orphans
 
-# Real parse + brief + schema + component-gen + feedback; stub handles verify/showcase only.
+# Real parse + brief + schema + component-gen + feedback; stub handles verify only.
 # Override scale: make dev-phase6-e2e COMPONENT_GEN_SCALE=3 FEEDBACK_SCALE=3
 dev-phase6-e2e: check-env down-phase6-e2e
 	STUB_SKIP_BRIEF=1 STUB_SKIP_SCHEMA=1 STUB_SKIP_COMPONENT=1 $(COMPOSE_BRIEF_E2E) up -d --build --wait postgres rabbitmq minio backend
@@ -63,7 +63,7 @@ dev-phase7-e2e: check-env down-phase7-e2e
 		--scale worker-component-gen=$(COMPONENT_GEN_SCALE) \
 		--scale worker-feedback=$(FEEDBACK_SCALE) \
 		worker-parse-text worker-parse-url worker-brief worker-schema \
-		worker-component-gen worker-feedback worker-verification worker-showcase
+		worker-component-gen worker-feedback worker-verification
 
 # Alias: brief-only real agent (stub still handles schema unless you use dev-phase5-e2e).
 dev-brief-e2e: check-env
@@ -86,7 +86,6 @@ test-phase6-unit:
 test-phase7-unit:
 	@PYTHONPATH=workers/src:pandora_shared python3.11 -m unittest \
 	  backend.tests.unit.test_verification_agent \
-	  backend.tests.unit.test_showcase_agent \
 	  -v
 
 up: check-env

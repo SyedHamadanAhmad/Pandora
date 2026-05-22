@@ -70,10 +70,6 @@ echo "==> Components (empty)"
 curl -sS -b "$COOKIE_JAR" "$BASE_URL/api/projects/$PROJECT_ID/components"
 echo ""
 
-echo "==> Showcase (empty)"
-curl -sS -b "$COOKIE_JAR" "$BASE_URL/api/projects/$PROJECT_ID/showcase"
-echo ""
-
 echo "==> Logout"
 curl -sS -b "$COOKIE_JAR" -o /dev/null -w "HTTP %{http_code}\n" \
   -X POST "$BASE_URL/api/auth/logout"

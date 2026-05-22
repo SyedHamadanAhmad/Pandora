@@ -19,7 +19,6 @@ from app.models.component import Component
 from app.models.design_brief import DesignBrief
 from app.models.design_schema import DesignSchema
 from app.models.project import Project
-from app.models.showcase_scene import ShowcaseScene
 from app.services import pipeline_state
 from app.services.idempotency import (
     IdempotencyStatus,
@@ -45,11 +44,6 @@ from pandora_shared.sse_events import (
     REVISION_RUNNING,
     VERIFICATION_RUNNING,
 )
-from pandora_shared.showcase_bundle import (
-    build_module_manifest,
-    build_showcase_bundle,
-    components_for_bundle_from_db,
-)
 from pandora_shared.events import (
     Attempt,
     MessageEnvelope,
@@ -66,8 +60,6 @@ from pandora_shared.queues import (
     PARSE_RESULTS,
     SCHEMA_READY,
     SCHEMA_REQUEST,
-    SHOWCASE_GENERATE,
-    SHOWCASE_READY,
     VERIFICATION_COMPLETE,
     VERIFICATION_START,
 )
@@ -79,7 +71,6 @@ MAX_REVISION_ROUNDS = 2
 
 VERIFICATION_START_EVENT = "pandora.verification.start"
 COMPONENT_GENERATE_EVENT = "pandora.component.generate"
-SHOWCASE_GENERATE_EVENT = "pandora.showcase.generate"
 
 Handler = Callable[[AbstractIncomingMessage, MessageBroker], Awaitable[None]]
 
@@ -461,29 +452,14 @@ async def _handle_verification_complete(
                     db,
                     idempotency_key=key,
                     project_id=envelope.project_id,
-                    handler=_noop_handler,
+                    handler=lambda session: _apply_pipeline_complete(session, envelope),
                 )
             if status == IdempotencyStatus.DUPLICATE:
+                state.run_complete = True
                 await message.ack()
                 return
 
-            async with async_session() as db:
-                showcase_payload = await _build_showcase_work_payload(db, envelope.project_id)
-            showcase_envelope = MessageEnvelope(
-                event=SHOWCASE_GENERATE_EVENT,
-                project_id=state.project_id,
-                pipeline_id=state.pipeline_id,
-                payload=showcase_payload,
-            )
-            await broker.publish(SHOWCASE_GENERATE, showcase_envelope)
-            _emit_project_event(
-                envelope.project_id,
-                {
-                    "type": "showcase_running",
-                    "projectId": envelope.project_id,
-                    "pipelineId": str(envelope.pipeline_id),
-                },
-            )
+            _finalize_pipeline_run(state, envelope.project_id, envelope.pipeline_id)
         await message.ack()
     except PipelineStateNotFoundError:
         logger.error("verification complete for unknown pipeline_id")
@@ -493,52 +469,6 @@ async def _handle_verification_complete(
         await _nack_poison(message)
     except Exception:
         logger.exception("verification complete handler failed")
-        await _nack_retry(message)
-
-
-async def _handle_showcase_ready(
-    message: AbstractIncomingMessage,
-    broker: MessageBroker,
-) -> None:
-    _ = broker
-    try:
-        envelope = decode_envelope(message.body)
-        if envelope.event != PipelineEvent.SHOWCASE_READY:
-            await message.ack()
-            return
-
-        key = idempotency_key_for_envelope(envelope)
-
-        async with async_session() as db:
-            status, _ = await run_idempotent(
-                db,
-                idempotency_key=key,
-                project_id=envelope.project_id,
-                handler=lambda session: _apply_showcase_ready(session, envelope),
-            )
-
-        if status == IdempotencyStatus.DUPLICATE:
-            await message.ack()
-            return
-
-        state = pipeline_states.get(envelope.pipeline_id)
-        if state is not None:
-            state.run_complete = True
-
-        _emit_project_event(
-            envelope.project_id,
-            {
-                "type": PIPELINE_COMPLETE,
-                "projectId": envelope.project_id,
-                "pipelineId": str(envelope.pipeline_id),
-            },
-        )
-        await message.ack()
-    except ValidationError:
-        logger.warning("invalid showcase ready message; dropping")
-        await _nack_poison(message)
-    except Exception:
-        logger.exception("showcase ready handler failed")
         await _nack_retry(message)
 
 
@@ -631,7 +561,6 @@ def _result_handlers() -> list[tuple[str, Handler]]:
         (COMPONENT_VALIDATED, _handle_component_validated),
         (COMPONENT_FAILED, _handle_component_failed),
         (VERIFICATION_COMPLETE, _handle_verification_complete),
-        (SHOWCASE_READY, _handle_showcase_ready),
     ]
 
 
@@ -667,6 +596,35 @@ async def _increment_resolved_and_check_gate(state: PipelineState) -> bool:
 
 async def _noop_handler(_session: AsyncSession) -> None:
     return None
+
+
+async def _apply_pipeline_complete(
+    session: AsyncSession,
+    envelope: MessageEnvelope,
+) -> None:
+    """Mark project completed when holism verification finishes (Phase -1)."""
+    project = await session.get(Project, envelope.project_id)
+    if project is None:
+        raise RuntimeError(f"project missing id={envelope.project_id}")
+    project.status = ProjectStatus.completed
+    await session.flush()
+
+
+def _finalize_pipeline_run(
+    state: PipelineState,
+    project_id: int,
+    pipeline_id: UUID,
+) -> None:
+    """In-memory gate + SSE after verification pass (no showcase step)."""
+    state.run_complete = True
+    _emit_project_event(
+        project_id,
+        {
+            "type": PIPELINE_COMPLETE,
+            "projectId": project_id,
+            "pipelineId": str(pipeline_id),
+        },
+    )
 
 
 async def _apply_brief_ready(
@@ -838,43 +796,6 @@ async def _build_verification_work_payload(
     }
 
 
-async def _build_showcase_work_payload(
-    session: AsyncSession,
-    project_id: int,
-) -> dict[str, Any]:
-    schema = await _latest_schema_for_project(session, project_id)
-    result = await session.execute(
-        select(Component)
-        .where(
-            Component.project_id == project_id,
-            Component.status == ComponentStatus.validated,
-        )
-        .order_by(Component.spec_index.asc())
-    )
-    components = result.scalars().all()
-    library: list[dict[str, Any]] = []
-    for component in components:
-        spec = _spec_for_component(schema, component.spec_index)
-        library.append(
-            {
-                "id": component.id,
-                "name": component.name,
-                "type": spec.get("type"),
-                "tsx_code": _truncate_text(component.tsx_code, limit=4000),
-                "css_code": _truncate_text(component.css_code, limit=2000),
-                "variants": component.variants,
-                "props": component.props,
-            }
-        )
-    manifest = build_module_manifest(library)
-    return {
-        "design_tokens": schema.design_tokens if schema else {},
-        "global_config": schema.global_config if schema else {},
-        "components": library,
-        "module_manifest": manifest,
-    }
-
-
 async def _apply_verification_revisions(
     session: AsyncSession,
     envelope: MessageEnvelope,
@@ -964,55 +885,6 @@ async def _fanout_revision_generates(
         )
         await broker.publish(COMPONENT_GENERATE, work)
 
-    await session.flush()
-
-
-async def _apply_showcase_ready(
-    session: AsyncSession,
-    envelope: MessageEnvelope,
-) -> None:
-    schema = await _latest_schema_for_project(session, envelope.project_id)
-    result = await session.execute(
-        select(Component)
-        .where(
-            Component.project_id == envelope.project_id,
-            Component.status == ComponentStatus.validated,
-        )
-        .order_by(Component.spec_index.asc())
-    )
-    component_rows = result.scalars().all()
-    bundle_components = components_for_bundle_from_db(component_rows)
-    design_tokens = schema.design_tokens if schema and schema.design_tokens else {}
-
-    scenes = envelope.payload.get("scenes") or []
-    for scene in scenes:
-        scene_tsx = scene.get("scene_tsx_code") or ""
-        scene_css = scene.get("scene_css_code")
-        scene_index = int(scene.get("scene_index", 0))
-        showcase_bundle = build_showcase_bundle(
-            design_tokens=design_tokens,
-            components=bundle_components,
-            scene_tsx=scene_tsx,
-            scene_css=scene_css if isinstance(scene_css, str) else None,
-            scene_index=scene_index,
-        )
-        session.add(
-            ShowcaseScene(
-                project_id=envelope.project_id,
-                scene_index=scene_index,
-                scene_name=scene.get("scene_name"),
-                scene_tsx_code=scene_tsx,
-                scene_css_code=scene_css,
-                components_used=scene.get("components_used"),
-                variant_selections=scene.get("variant_selections"),
-                showcase_bundle=showcase_bundle,
-            )
-        )
-
-    project = await session.get(Project, envelope.project_id)
-    if project is None:
-        raise RuntimeError(f"project missing id={envelope.project_id}")
-    project.status = ProjectStatus.completed
     await session.flush()
 
 

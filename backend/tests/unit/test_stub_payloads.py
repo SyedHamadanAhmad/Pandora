@@ -15,7 +15,6 @@ from pandora_stub.downstream_worker import (  # noqa: E402
     _brief_ready_payload,
     _component_validated_payload,
     _schema_ready_payload,
-    _showcase_ready_payload,
     _verification_complete_payload,
 )
 from pandora_stub.parse_worker import _parse_data  # noqa: E402
@@ -65,16 +64,6 @@ class StubPayloadTests(unittest.TestCase):
         payload = _component_validated_payload(work)
         self.assertIn("tsx_code", payload)
         self.assertIn("Button", payload["tsx_code"])
-
-    def test_showcase_has_scene(self) -> None:
-        work = MessageEnvelope(
-            event=PipelineEvent.SHOWCASE_READY,
-            project_id=1,
-            pipeline_id=uuid4(),
-            payload={},
-        )
-        payload = _showcase_ready_payload(work)
-        self.assertEqual(len(payload["scenes"]), 1)
 
     def test_brief_preserves_input_gaps(self) -> None:
         work = MessageEnvelope(

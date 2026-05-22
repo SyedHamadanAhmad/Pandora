@@ -145,19 +145,3 @@ services:
         condition: service_started
     networks:
       - pandora-net
-
-  worker-showcase:
-    <<: *agent-restart
-    profiles: ["agents-downstream"]
-    build:
-      context: .
-      dockerfile: workers/Dockerfile.base
-    command: ["python", "-m", "pandora_workers.run.showcase"]
-    env_file: .env
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
-      backend:
-        condition: service_started
-    networks:
-      - pandora-net

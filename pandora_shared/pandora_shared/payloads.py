@@ -161,26 +161,3 @@ class VerificationCompletePayload(BaseModel):
         return any(issue.priority in ("P1", "P2") for issue in self.issues)
 
 
-class ShowcaseGenerateWorkPayload(BaseModel):
-    """Work on ``pandora.showcase.generate``."""
-
-    design_tokens: dict[str, Any] | None = None
-    global_config: dict[str, Any] | None = None
-    components: list[dict[str, Any]] = Field(default_factory=list)
-    module_manifest: dict[str, Any] | None = None
-
-
-class ShowcaseScenePayload(BaseModel):
-    scene_index: int = 0
-    scene_name: str | None = None
-    scene_tsx_code: str | None = None
-    scene_css_code: str | None = None
-    components_used: list[str] = Field(default_factory=list)
-    variant_selections: dict[str, str] | None = None
-    entry_path: str | None = None
-
-
-class ShowcaseReadyPayload(BaseModel):
-    """Result on ``pandora.showcase.ready``."""
-
-    scenes: list[ShowcaseScenePayload] = Field(default_factory=list)

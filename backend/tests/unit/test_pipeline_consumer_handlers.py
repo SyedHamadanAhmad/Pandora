@@ -13,7 +13,7 @@ from app.services.pipeline_consumer import (
     _handle_component_outcome,
     _handle_parse_results,
     _handle_schema_ready,
-    _handle_showcase_ready,
+    _handle_verification_complete,
     _start_verification,
 )
 from app.services.pipeline_state import PipelineState
@@ -274,7 +274,7 @@ class ComponentOutcomeHandlerTests(unittest.IsolatedAsyncioTestCase):
         message.ack.assert_awaited_once()
 
     async def test_run_complete_skips_holism_gate(self) -> None:
-        """Pipeline state kept after showcase; storybook regen must not re-run verification."""
+        """Pipeline state kept after holism completes; storybook regen must not re-run verification."""
         pipeline_id = uuid4()
         state = PipelineState(
             project_id=1,
@@ -433,31 +433,25 @@ class SchemaReadyHandlerTests(unittest.IsolatedAsyncioTestCase):
         message.ack.assert_awaited_once()
 
 
-class ShowcaseReadyHandlerTests(unittest.IsolatedAsyncioTestCase):
+class VerificationCompleteHandlerTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
         pipeline_state.pipeline_states.clear()
 
     def tearDown(self) -> None:
         pipeline_state.pipeline_states.clear()
 
-    async def test_wrong_event_acks(self) -> None:
-        envelope = _envelope(event=PipelineEvent.BRIEF_READY)
-        message = _message(envelope.model_dump(mode="json"))
-
-        with patch(
-            "app.services.pipeline_consumer.decode_envelope",
-            return_value=envelope,
-        ):
-            await _handle_showcase_ready(message, MagicMock())
-
-        message.ack.assert_awaited_once()
-
-    async def test_applied_marks_run_complete_and_keeps_state(self) -> None:
+    async def test_pass_finalizes_without_showcase(self) -> None:
         pipeline_id = uuid4()
-        state = PipelineState(project_id=1, pipeline_id=pipeline_id)
+        state = PipelineState(project_id=1, pipeline_id=pipeline_id, revision_round=0)
         pipeline_state.pipeline_states[pipeline_id] = state
-        envelope = _envelope(event=PipelineEvent.SHOWCASE_READY, pipeline_id=pipeline_id)
+        envelope = _envelope(
+            event=PipelineEvent.VERIFICATION_COMPLETE,
+            pipeline_id=pipeline_id,
+            payload={"issues": [], "approved": True},
+        )
         message = _message(envelope.model_dump(mode="json"))
+        broker = MagicMock()
+        broker.publish = AsyncMock()
 
         with (
             patch(
@@ -469,12 +463,45 @@ class ShowcaseReadyHandlerTests(unittest.IsolatedAsyncioTestCase):
                 new_callable=AsyncMock,
                 return_value=(IdempotencyStatus.APPLIED, None),
             ),
-            patch("app.services.pipeline_consumer._emit_project_event"),
+            patch(
+                "app.services.pipeline_consumer._finalize_pipeline_run",
+            ) as finalize,
         ):
-            await _handle_showcase_ready(message, MagicMock())
+            await _handle_verification_complete(message, broker)
 
-        self.assertIs(pipeline_state.pipeline_states.get(pipeline_id), state)
+        broker.publish.assert_not_awaited()
+        finalize.assert_called_once_with(state, envelope.project_id, pipeline_id)
+        message.ack.assert_awaited_once()
+
+    async def test_pass_duplicate_sets_run_complete(self) -> None:
+        pipeline_id = uuid4()
+        state = PipelineState(project_id=1, pipeline_id=pipeline_id)
+        pipeline_state.pipeline_states[pipeline_id] = state
+        envelope = _envelope(
+            event=PipelineEvent.VERIFICATION_COMPLETE,
+            pipeline_id=pipeline_id,
+            payload={"issues": []},
+        )
+        message = _message(envelope.model_dump(mode="json"))
+
+        with (
+            patch(
+                "app.services.pipeline_consumer.decode_envelope",
+                return_value=envelope,
+            ),
+            patch(
+                "app.services.pipeline_consumer.run_idempotent",
+                new_callable=AsyncMock,
+                return_value=(IdempotencyStatus.DUPLICATE, None),
+            ),
+            patch(
+                "app.services.pipeline_consumer._finalize_pipeline_run",
+            ) as finalize,
+        ):
+            await _handle_verification_complete(message, MagicMock())
+
         self.assertTrue(state.run_complete)
+        finalize.assert_not_called()
         message.ack.assert_awaited_once()
 
 

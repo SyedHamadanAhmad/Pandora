@@ -23,10 +23,6 @@ VERIFICATION_START = "pandora.verification.start"
 VERIFICATION_REVISIONS = "pandora.verification.revisions"
 VERIFICATION_COMPLETE = "pandora.verification.complete"
 
-# Showcase
-SHOWCASE_GENERATE = "pandora.showcase.generate"
-SHOWCASE_READY = "pandora.showcase.ready"
-
 # Frontend SSE relay
 FRONTEND_EVENTS = "pandora.frontend.events"
 
@@ -46,7 +42,5 @@ ALL_QUEUES: list[str] = [
     VERIFICATION_START,
     VERIFICATION_REVISIONS,
     VERIFICATION_COMPLETE,
-    SHOWCASE_GENERATE,
-    SHOWCASE_READY,
     FRONTEND_EVENTS,
 ]

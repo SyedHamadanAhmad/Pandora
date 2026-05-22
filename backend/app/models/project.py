@@ -13,7 +13,6 @@ if TYPE_CHECKING:
     from app.models.design_brief import DesignBrief
     from app.models.design_schema import DesignSchema
     from app.models.processed_event import ProcessedEvent
-    from app.models.showcase_scene import ShowcaseScene
     from app.models.thread_message import ThreadMessage
     from app.models.user import User
 
@@ -52,9 +51,6 @@ class Project(Base):
         back_populates="project", cascade="all, delete-orphan"
     )
     components: Mapped[list["Component"]] = relationship(
-        back_populates="project", cascade="all, delete-orphan"
-    )
-    showcase_scenes: Mapped[list["ShowcaseScene"]] = relationship(
         back_populates="project", cascade="all, delete-orphan"
     )
     processed_events: Mapped[list["ProcessedEvent"]] = relationship(

@@ -10,7 +10,6 @@ from app.database import get_db
 from app.middleware.session_auth import get_current_user_id
 from app.models.component import Component
 from app.models.project import Project
-from app.models.showcase_scene import ShowcaseScene
 from app.services.project_access import get_project_for_user
 from app.schemas.component import ComponentListResponse
 from app.schemas.project import (
@@ -19,7 +18,6 @@ from app.schemas.project import (
     ProjectResponse,
 )
 from app.schemas.component import ComponentResponse
-from app.schemas.showcase import ShowcaseListResponse, ShowcaseSceneResponse
 from pandora_shared.enums import ProjectStatus
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
@@ -77,24 +75,6 @@ async def list_components(
     components = result.scalars().all()
     return ComponentListResponse(
         components=[ComponentResponse.model_validate(c) for c in components]
-    )
-
-
-@router.get("/{project_id}/showcase", response_model=ShowcaseListResponse)
-async def list_showcase_scenes(
-    project_id: int,
-    user_id: int = Depends(get_current_user_id),
-    db: AsyncSession = Depends(get_db),
-) -> ShowcaseListResponse:
-    await get_project_for_user(db, project_id, user_id)
-    result = await db.execute(
-        select(ShowcaseScene)
-        .where(ShowcaseScene.project_id == project_id)
-        .order_by(ShowcaseScene.scene_index.asc())
-    )
-    scenes = result.scalars().all()
-    return ShowcaseListResponse(
-        scenes=[ShowcaseSceneResponse.model_validate(s) for s in scenes]
     )
 
 

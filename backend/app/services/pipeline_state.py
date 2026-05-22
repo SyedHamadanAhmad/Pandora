@@ -56,7 +56,7 @@ class PipelineState:
     parse_received: int = 0
     parse_pending: set[str] = field(default_factory=set)
     revision_round: int = 0
-    # Set when showcase.ready is applied; storybook regen uses state but skips holism gates.
+    # Set when holism verification finishes (post-revision); storybook regen skips holism gates.
     run_complete: bool = False
     _timeout_tasks: list[asyncio.Task[None]] = field(default_factory=list, repr=False, compare=False)
     _on_parses_complete: OnParsesComplete | None = field(default=None, repr=False, compare=False)
