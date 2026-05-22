@@ -11,7 +11,13 @@ from app.pipeline_runtime import (
     shutdown_pipeline_runtime,
     start_pipeline_runtime,
 )
-from app.routers import auth_router, projects_router, stream_router, thread_router
+from app.routers import (
+    auth_router,
+    projects_router,
+    storybook_router,
+    stream_router,
+    thread_router,
+)
 
 
 @asynccontextmanager
@@ -28,6 +34,7 @@ app = FastAPI(title="Pandora API", version="0.1.0", lifespan=lifespan)
 
 app.include_router(auth_router)
 app.include_router(projects_router)
+app.include_router(storybook_router)
 app.include_router(stream_router)
 app.include_router(thread_router)
 
