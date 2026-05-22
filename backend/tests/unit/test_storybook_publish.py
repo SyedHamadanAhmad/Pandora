@@ -23,7 +23,7 @@ class _Schema:
 
 class BuildEnvelopeTests(unittest.TestCase):
     def test_build_component_generate_envelope_shape(self) -> None:
-        pipeline_id = uuid4()
+        pipeline_id = 42
         envelope = build_component_generate_envelope(
             project_id=10,
             pipeline_id=pipeline_id,
@@ -44,7 +44,7 @@ class BuildEnvelopeTests(unittest.TestCase):
         self.assertTrue(envelope.payload["storybook_ad_hoc"])
 
     def test_holism_envelope_omits_storybook_ad_hoc(self) -> None:
-        pipeline_id = uuid4()
+        pipeline_id = 42
         envelope = build_component_generate_envelope(
             project_id=1,
             pipeline_id=pipeline_id,

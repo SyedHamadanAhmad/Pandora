@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
-from uuid import uuid4
 
 from app.services.pipeline_consumer import _fanout_revision_generates
 from app.services.pipeline_state import PipelineState
@@ -30,7 +29,7 @@ class _Schema:
 
 class FanoutRevisionEnvelopeTests(unittest.IsolatedAsyncioTestCase):
     async def test_fanout_uses_shared_envelope_without_storybook_ad_hoc(self) -> None:
-        pipeline_id = uuid4()
+        pipeline_id = 42
         state = PipelineState(project_id=10, pipeline_id=pipeline_id, revision_round=2)
         component = _Component()
         session = AsyncMock()

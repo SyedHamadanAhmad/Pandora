@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from typing import Any
-from uuid import UUID
 
 from fastapi import HTTPException, status
 from sqlalchemy import select
@@ -25,12 +24,12 @@ TOKEN_REGEN_REVISION_INSTRUCTION = (
 )
 
 
-async def resolve_latest_pipeline_id(session: AsyncSession, project_id: int) -> UUID:
+async def resolve_latest_pipeline_run_id(session: AsyncSession, project_id: int) -> int:
     row = await session.scalar(
-        select(ThreadMessage.pipeline_id)
+        select(ThreadMessage.pipeline_run_id)
         .where(
             ThreadMessage.project_id == project_id,
-            ThreadMessage.pipeline_id.is_not(None),
+            ThreadMessage.pipeline_run_id.is_not(None),
         )
         .order_by(ThreadMessage.id.desc())
         .limit(1)
@@ -38,7 +37,7 @@ async def resolve_latest_pipeline_id(session: AsyncSession, project_id: int) -> 
     if row is None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="No pipeline_id on thread messages for this project",
+            detail="No pipeline_run_id on thread messages for this project",
         )
     return row
 
@@ -46,7 +45,7 @@ async def resolve_latest_pipeline_id(session: AsyncSession, project_id: int) -> 
 def build_component_generate_envelope(
     *,
     project_id: int,
-    pipeline_id: UUID,
+    pipeline_id: int,
     component: Component,
     schema: DesignSchema,
     design_tokens: dict[str, Any] | None,
@@ -87,7 +86,7 @@ async def fanout_token_regeneration(
     design_tokens: dict[str, Any],
 ) -> int:
     """Re-queue component.generate for all validated components (token apply)."""
-    pipeline_id = await resolve_latest_pipeline_id(session, project_id)
+    pipeline_run_id = await resolve_latest_pipeline_run_id(session, project_id)
     result = await session.execute(
         select(Component)
         .where(
@@ -107,7 +106,7 @@ async def fanout_token_regeneration(
         component.revision_round = component.revision_round + 1
         envelope = build_component_generate_envelope(
             project_id=project_id,
-            pipeline_id=pipeline_id,
+            pipeline_id=pipeline_run_id,
             component=component,
             schema=schema,
             design_tokens=design_tokens,

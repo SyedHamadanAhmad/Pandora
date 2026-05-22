@@ -2,12 +2,13 @@
 
 import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
-from uuid import UUID
 
 from app.services import pipeline_state
 from app.services.pipeline_service import trigger_pipeline_run
 from pandora_shared.enums import ProjectStatus
 from pandora_shared.queues import PARSE_TEXT
+
+_PIPELINE_RUN_ID = 99
 
 
 class PipelineServiceTests(unittest.IsolatedAsyncioTestCase):
@@ -26,7 +27,8 @@ class PipelineServiceTests(unittest.IsolatedAsyncioTestCase):
         message.content = "Modern dashboard"
         message.input_image_urls = None
         message.input_urls = None
-        message.pipeline_id = None
+        message.id = 10
+        message.pipeline_run_id = None
 
         db = AsyncMock()
         broker = AsyncMock()
@@ -37,10 +39,22 @@ class PipelineServiceTests(unittest.IsolatedAsyncioTestCase):
 
         broker.publish.side_effect = capture_publish
 
+        mock_state = pipeline_state.PipelineState(
+            project_id=1,
+            pipeline_id=_PIPELINE_RUN_ID,
+            parse_expected=1,
+            parse_pending={"text"},
+        )
+
         with (
             patch(
                 "app.services.pipeline_service.copy_thread_images_to_pipeline",
                 new_callable=AsyncMock,
+            ),
+            patch(
+                "app.services.pipeline_service.pipeline_state.init_state_from_thread",
+                new_callable=AsyncMock,
+                return_value=mock_state,
             ),
             patch(
                 "app.services.pipeline_service.pipeline_state.schedule_parse_timeouts",
@@ -49,16 +63,12 @@ class PipelineServiceTests(unittest.IsolatedAsyncioTestCase):
             result = await trigger_pipeline_run(db, broker, project, message)
 
         self.assertEqual(result.status, ProjectStatus.running)
-        self.assertIsInstance(result.pipeline_id, UUID)
-        self.assertEqual(message.pipeline_id, result.pipeline_id)
+        self.assertEqual(result.pipeline_id, _PIPELINE_RUN_ID)
         self.assertEqual(project.status, ProjectStatus.running)
         db.commit.assert_awaited()
         broker.publish.assert_awaited_once()
         self.assertEqual(published, [PARSE_TEXT])
         self.assertIn(result.pipeline_id, pipeline_state.pipeline_states)
-
-        for task in pipeline_state.get_state(result.pipeline_id)._timeout_tasks:
-            task.cancel()
 
 
 if __name__ == "__main__":

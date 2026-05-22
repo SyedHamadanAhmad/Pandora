@@ -23,7 +23,7 @@ from pandora_shared.payloads import ParseResultPayload
 
 class IdempotencyKeyTests(unittest.TestCase):
     def test_key_for_envelope_with_component_attempt(self) -> None:
-        pipeline_id = uuid4()
+        pipeline_id = 42
         component_id = 42
         envelope = MessageEnvelope(
             event="pandora.component.validated",
@@ -44,7 +44,7 @@ class IdempotencyKeyTests(unittest.TestCase):
         )
 
     def test_verification_start_key_includes_revision_round(self) -> None:
-        pipeline_id = uuid4()
+        pipeline_id = 42
         key = build_idempotency_key(
             pipeline_id,
             "pandora.verification.start",
@@ -53,12 +53,12 @@ class IdempotencyKeyTests(unittest.TestCase):
         self.assertEqual(key, f"{pipeline_id}:pandora.verification.start:0.2")
 
     def test_parse_results_key_includes_source(self) -> None:
-        pipeline_id = uuid4()
+        pipeline_id = 42
         key = parse_results_idempotency_key(pipeline_id, "text")
         self.assertEqual(key, f"{pipeline_id}:pandora.parse.results:text")
 
     def test_idempotency_key_for_parse_result_envelope(self) -> None:
-        pipeline_id = uuid4()
+        pipeline_id = 42
         envelope = MessageEnvelope(
             event=PipelineEvent.PARSE_RESULTS,
             project_id=1,
@@ -153,7 +153,7 @@ class RunIdempotentIntegrationTests(unittest.IsolatedAsyncioTestCase):
         from app.models.user import User
         from pandora_shared.enums import ProjectStatus
 
-        pipeline_id = uuid4()
+        pipeline_id = 42
         key = f"{pipeline_id}:pandora.brief.ready"
         calls = 0
 

@@ -19,7 +19,7 @@ class MessageBrokerTests(unittest.IsolatedAsyncioTestCase):
                 captured["routing_key"] = routing_key
 
         channel = type("Ch", (), {"default_exchange": FakeExchange()})()
-        pipeline_id = uuid4()
+        pipeline_id = 42
         envelope = MessageEnvelope(
             event="pandora.parse.request",
             project_id=1,

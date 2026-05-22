@@ -15,6 +15,7 @@ from app.main import app
 from app.models.component import Component
 from app.models.design_brief import DesignBrief
 from app.models.design_schema import DesignSchema
+from app.models.pipeline_run import PipelineRun
 from app.models.project import Project
 from app.models.thread_message import ThreadMessage
 from app.services.message_broker import MessageBroker
@@ -63,7 +64,7 @@ async def seed_storybook_library(
     component_status: ComponentStatus = ComponentStatus.validated,
     with_pipeline: bool = True,
 ) -> tuple[int, int]:
-    pipeline_id = uuid4()
+    pipeline_run_id = 9001
     async with async_session() as db:
         project = Project(
             user_id=user_id,
@@ -112,15 +113,25 @@ async def seed_storybook_library(
         await db.flush()
 
         if with_pipeline:
-            db.add(
-                ThreadMessage(
-                    project_id=project.id,
-                    user_id=user_id,
-                    role="user",
-                    content="hi",
-                    pipeline_id=pipeline_id,
-                )
+            message = ThreadMessage(
+                project_id=project.id,
+                user_id=user_id,
+                role="user",
+                content="hi",
             )
+            db.add(message)
+            await db.flush()
+            run = PipelineRun(
+                project_id=project.id,
+                thread_message_id=message.id,
+                parse_expected=1,
+                parse_received=1,
+                parse_pending=[],
+                run_complete=True,
+            )
+            db.add(run)
+            await db.flush()
+            message.pipeline_run_id = run.id
         await db.commit()
         await db.refresh(component)
         return project.id, component.id

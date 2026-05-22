@@ -5,8 +5,6 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable
 from enum import Enum
 from typing import TypeVar
-from uuid import UUID
-
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -48,7 +46,7 @@ def idempotency_key_for_envelope(
     )
 
 
-def parse_results_idempotency_key(pipeline_id: UUID, source: str) -> str:
+def parse_results_idempotency_key(pipeline_id: int, source: str) -> str:
     """Idempotency key for a single parser result (text | image | url)."""
     return build_idempotency_key(pipeline_id, parse_results_idempotency_event(source))
 

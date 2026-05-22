@@ -68,7 +68,7 @@ class ComponentGenHelperTests(unittest.TestCase):
 class ComponentGenAgentTests(unittest.IsolatedAsyncioTestCase):
     async def test_publishes_component_generated(self) -> None:
         agent = ComponentGenAgent()
-        pipeline_id = uuid4()
+        pipeline_id = 42
         work = MessageEnvelope(
             event="pandora.component.generate",
             project_id=5,
@@ -115,7 +115,7 @@ class ComponentGenAgentTests(unittest.IsolatedAsyncioTestCase):
         work = MessageEnvelope(
             event="pandora.component.generate",
             project_id=1,
-            pipeline_id=uuid4(),
+            pipeline_id=1,
             component_id=7,
             payload={"spec": {"name": "Card", "variants": ["default"]}},
         )
@@ -140,7 +140,7 @@ class ComponentGenAgentTests(unittest.IsolatedAsyncioTestCase):
         work = MessageEnvelope(
             event="pandora.component.generate",
             project_id=1,
-            pipeline_id=uuid4(),
+            pipeline_id=1,
             payload={"spec": {"name": "X"}},
         )
         with self.assertRaises(ValueError):

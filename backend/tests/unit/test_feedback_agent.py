@@ -51,7 +51,7 @@ class FeedbackAgentTests(unittest.IsolatedAsyncioTestCase):
         work = MessageEnvelope(
             event=PipelineEvent.COMPONENT_GENERATED,
             project_id=2,
-            pipeline_id=uuid4(),
+            pipeline_id=1,
             component_id=99,
             payload={
                 "tsx_code": "export function X() { return <span>ok</span>; }",
@@ -75,7 +75,7 @@ class FeedbackAgentTests(unittest.IsolatedAsyncioTestCase):
         work = MessageEnvelope(
             event=PipelineEvent.COMPONENT_GENERATED,
             project_id=2,
-            pipeline_id=uuid4(),
+            pipeline_id=1,
             component_id=100,
             payload={
                 "tsx_code": "export const broken = ;",
@@ -102,7 +102,7 @@ class FeedbackAgentTests(unittest.IsolatedAsyncioTestCase):
         message.body = MessageEnvelope(
             event=PipelineEvent.COMPONENT_GENERATED,
             project_id=1,
-            pipeline_id=uuid4(),
+            pipeline_id=1,
             component_id=1,
             payload={
                 "tsx_code": "bad",
@@ -133,7 +133,7 @@ class FeedbackAgentTests(unittest.IsolatedAsyncioTestCase):
         message.body = MessageEnvelope(
             event=PipelineEvent.COMPONENT_GENERATED,
             project_id=1,
-            pipeline_id=uuid4(),
+            pipeline_id=1,
             component_id=2,
             payload={
                 "tsx_code": "export function Ok() { return null; }",

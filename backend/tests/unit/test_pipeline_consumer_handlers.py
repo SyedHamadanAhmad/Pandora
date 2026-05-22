@@ -3,9 +3,9 @@
 import json
 import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
-from uuid import uuid4
-
 from app.services import pipeline_state
+
+_PIPELINE_RUN_ID = 1001
 from app.services.idempotency import IdempotencyStatus
 from app.services.pipeline_consumer import (
     _ensure_verification_if_gate_open,
@@ -40,7 +40,7 @@ def _envelope(
     return MessageEnvelope(
         event=event,
         project_id=project_id,
-        pipeline_id=pipeline_id or uuid4(),
+        pipeline_id=pipeline_id if pipeline_id is not None else _PIPELINE_RUN_ID,
         component_id=component_id,
         payload=payload or {},
     )
@@ -48,7 +48,7 @@ def _envelope(
 
 class EnsureVerificationGateTests(unittest.IsolatedAsyncioTestCase):
     async def test_skips_when_db_resolved_below_expected(self) -> None:
-        pipeline_id = uuid4()
+        pipeline_id = _PIPELINE_RUN_ID
         state = PipelineState(project_id=1, pipeline_id=pipeline_id, expected_components=3)
         broker = MagicMock()
         broker.publish = AsyncMock()
@@ -74,7 +74,7 @@ class EnsureVerificationGateTests(unittest.IsolatedAsyncioTestCase):
         start_verification.assert_not_awaited()
 
     async def test_starts_when_db_gate_open(self) -> None:
-        pipeline_id = uuid4()
+        pipeline_id = _PIPELINE_RUN_ID
         state = PipelineState(project_id=1, pipeline_id=pipeline_id, expected_components=2)
         broker = MagicMock()
 
@@ -107,7 +107,7 @@ class ParseResultsHandlerTests(unittest.IsolatedAsyncioTestCase):
         pipeline_state.pipeline_states.clear()
 
     async def test_wrong_event_acks(self) -> None:
-        pipeline_id = uuid4()
+        pipeline_id = _PIPELINE_RUN_ID
         pipeline_state.init_state_from_thread(
             1,
             pipeline_id,
@@ -134,7 +134,7 @@ class BriefReadyHandlerTests(unittest.IsolatedAsyncioTestCase):
         pipeline_state.pipeline_states.clear()
 
     async def test_wrong_event_acks(self) -> None:
-        pipeline_id = uuid4()
+        pipeline_id = _PIPELINE_RUN_ID
         pipeline_state.pipeline_states[pipeline_id] = PipelineState(
             project_id=1, pipeline_id=pipeline_id
         )
@@ -158,7 +158,7 @@ class ComponentOutcomeHandlerTests(unittest.IsolatedAsyncioTestCase):
         pipeline_state.pipeline_states.clear()
 
     async def test_missing_component_id_nacks_poison(self) -> None:
-        pipeline_id = uuid4()
+        pipeline_id = _PIPELINE_RUN_ID
         pipeline_state.pipeline_states[pipeline_id] = PipelineState(
             project_id=1, pipeline_id=pipeline_id
         )
@@ -184,7 +184,7 @@ class ComponentOutcomeHandlerTests(unittest.IsolatedAsyncioTestCase):
         message.ack.assert_not_awaited()
 
     async def test_duplicate_still_ensures_verification(self) -> None:
-        pipeline_id = uuid4()
+        pipeline_id = _PIPELINE_RUN_ID
         state = PipelineState(
             project_id=1,
             pipeline_id=pipeline_id,
@@ -226,7 +226,7 @@ class ComponentOutcomeHandlerTests(unittest.IsolatedAsyncioTestCase):
         message.ack.assert_awaited_once()
 
     async def test_applied_with_open_gate_ensures_verification(self) -> None:
-        pipeline_id = uuid4()
+        pipeline_id = _PIPELINE_RUN_ID
         state = PipelineState(
             project_id=1,
             pipeline_id=pipeline_id,
@@ -275,7 +275,7 @@ class ComponentOutcomeHandlerTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_run_complete_skips_holism_gate(self) -> None:
         """Pipeline state kept after holism completes; storybook regen must not re-run verification."""
-        pipeline_id = uuid4()
+        pipeline_id = _PIPELINE_RUN_ID
         state = PipelineState(
             project_id=1,
             pipeline_id=pipeline_id,
@@ -324,7 +324,7 @@ class ComponentOutcomeHandlerTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_ad_hoc_outcome_without_pipeline_state_emits_sse_and_acks(self) -> None:
         """State lost after API restart: still persist + SSE without holism gate."""
-        pipeline_id = uuid4()
+        pipeline_id = _PIPELINE_RUN_ID
         envelope = _envelope(
             event=PipelineEvent.COMPONENT_VALIDATED,
             pipeline_id=pipeline_id,
@@ -371,7 +371,7 @@ class ComponentOutcomeHandlerTests(unittest.IsolatedAsyncioTestCase):
         message.nack.assert_not_awaited()
 
     async def test_ad_hoc_duplicate_acks_without_verification_or_sse(self) -> None:
-        pipeline_id = uuid4()
+        pipeline_id = _PIPELINE_RUN_ID
         envelope = _envelope(
             event=PipelineEvent.COMPONENT_FAILED,
             pipeline_id=pipeline_id,
@@ -417,7 +417,7 @@ class SchemaReadyHandlerTests(unittest.IsolatedAsyncioTestCase):
         pipeline_state.pipeline_states.clear()
 
     async def test_wrong_event_acks(self) -> None:
-        pipeline_id = uuid4()
+        pipeline_id = _PIPELINE_RUN_ID
         pipeline_state.pipeline_states[pipeline_id] = PipelineState(
             project_id=1, pipeline_id=pipeline_id
         )
@@ -441,7 +441,7 @@ class VerificationCompleteHandlerTests(unittest.IsolatedAsyncioTestCase):
         pipeline_state.pipeline_states.clear()
 
     async def test_pass_finalizes_without_showcase(self) -> None:
-        pipeline_id = uuid4()
+        pipeline_id = _PIPELINE_RUN_ID
         state = PipelineState(project_id=1, pipeline_id=pipeline_id, revision_round=0)
         pipeline_state.pipeline_states[pipeline_id] = state
         envelope = _envelope(
@@ -465,16 +465,17 @@ class VerificationCompleteHandlerTests(unittest.IsolatedAsyncioTestCase):
             ),
             patch(
                 "app.services.pipeline_consumer._finalize_pipeline_run",
+                new_callable=AsyncMock,
             ) as finalize,
         ):
             await _handle_verification_complete(message, broker)
 
         broker.publish.assert_not_awaited()
-        finalize.assert_called_once_with(state, envelope.project_id, pipeline_id)
+        finalize.assert_awaited_once_with(state, envelope.project_id, pipeline_id)
         message.ack.assert_awaited_once()
 
     async def test_pass_duplicate_sets_run_complete(self) -> None:
-        pipeline_id = uuid4()
+        pipeline_id = _PIPELINE_RUN_ID
         state = PipelineState(project_id=1, pipeline_id=pipeline_id)
         pipeline_state.pipeline_states[pipeline_id] = state
         envelope = _envelope(
@@ -496,18 +497,23 @@ class VerificationCompleteHandlerTests(unittest.IsolatedAsyncioTestCase):
             ),
             patch(
                 "app.services.pipeline_consumer._finalize_pipeline_run",
+                new_callable=AsyncMock,
             ) as finalize,
+            patch(
+                "app.services.pipeline_consumer.persist_state",
+                new_callable=AsyncMock,
+            ),
         ):
             await _handle_verification_complete(message, MagicMock())
 
         self.assertTrue(state.run_complete)
-        finalize.assert_not_called()
+        finalize.assert_not_awaited()
         message.ack.assert_awaited_once()
 
 
 class StartVerificationTests(unittest.IsolatedAsyncioTestCase):
     async def test_duplicate_claim_skips_publish(self) -> None:
-        pipeline_id = uuid4()
+        pipeline_id = _PIPELINE_RUN_ID
         state = PipelineState(project_id=1, pipeline_id=pipeline_id)
         broker = MagicMock()
         broker.publish = AsyncMock()
@@ -522,7 +528,7 @@ class StartVerificationTests(unittest.IsolatedAsyncioTestCase):
         broker.publish.assert_not_awaited()
 
     async def test_applied_publishes_verification_start(self) -> None:
-        pipeline_id = uuid4()
+        pipeline_id = _PIPELINE_RUN_ID
         state = PipelineState(project_id=1, pipeline_id=pipeline_id)
         broker = MagicMock()
         broker.publish = AsyncMock()

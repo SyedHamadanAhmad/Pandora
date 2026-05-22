@@ -82,7 +82,7 @@ class VerificationAgentTests(unittest.IsolatedAsyncioTestCase):
         work = MessageEnvelope(
             event="pandora.verification.start",
             project_id=10,
-            pipeline_id=uuid4(),
+            pipeline_id=1,
             payload={
                 "design_tokens": {"primary": "#000"},
                 "components": [

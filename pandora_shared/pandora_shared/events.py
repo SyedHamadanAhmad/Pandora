@@ -5,8 +5,6 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from enum import StrEnum
 from typing import Any
-from uuid import UUID
-
 from pydantic import BaseModel, Field
 
 from pandora_shared.payloads import PARSE_SOURCES, ParseResultPayload, ParseSource
@@ -50,7 +48,7 @@ class MessageEnvelope(BaseModel):
 
     event: str
     project_id: int
-    pipeline_id: UUID
+    pipeline_id: int
     component_id: int | None = None
     attempt: Attempt | None = None
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -58,7 +56,7 @@ class MessageEnvelope(BaseModel):
 
 
 def build_idempotency_key(
-    pipeline_id: UUID,
+    pipeline_id: int,
     event: str,
     *,
     component_id: int | None = None,

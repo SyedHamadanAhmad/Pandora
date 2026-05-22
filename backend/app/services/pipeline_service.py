@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from uuid import UUID, uuid4
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -20,7 +19,7 @@ from pandora_shared.queues import PARSE_IMAGE, PARSE_TEXT, PARSE_URL
 
 @dataclass(frozen=True)
 class TriggerResult:
-    pipeline_id: UUID
+    pipeline_id: int
     status: ProjectStatus
 
 
@@ -33,40 +32,38 @@ async def trigger_pipeline_run(
     """
     Assign run identity, persist running status, seed PipelineState, publish parse work.
 
-    Call after the thread message row is committed (including image URLs).
+    Call after the thread message row is flushed (including image URLs).
     """
-    pipeline_id = uuid4()
+    state = await pipeline_state.init_state_from_thread(
+        db,
+        project.id,
+        message,
+        on_parses_complete=make_parses_complete_callback(broker),
+    )
+    pipeline_run_id = state.pipeline_id
 
     if message.input_image_urls:
         message.input_image_urls = await copy_thread_images_to_pipeline(
             project.id,
-            pipeline_id,
+            pipeline_run_id,
             message.input_image_urls,
         )
 
-    message.pipeline_id = pipeline_id
     project.status = ProjectStatus.running
     await db.commit()
     await db.refresh(message)
     await db.refresh(project)
 
-    pipeline_state.init_state_from_thread(
-        project.id,
-        pipeline_id,
-        message,
-        on_parses_complete=make_parses_complete_callback(broker),
-    )
-    pipeline_state.schedule_parse_timeouts(pipeline_id)
+    pipeline_state.schedule_parse_timeouts(pipeline_run_id)
+    await _publish_parse_jobs(broker, project.id, pipeline_run_id, message)
 
-    await _publish_parse_jobs(broker, project.id, pipeline_id, message)
-
-    return TriggerResult(pipeline_id=pipeline_id, status=ProjectStatus.running)
+    return TriggerResult(pipeline_id=pipeline_run_id, status=ProjectStatus.running)
 
 
 async def _publish_parse_jobs(
     broker: MessageBroker,
     project_id: int,
-    pipeline_id: UUID,
+    pipeline_run_id: int,
     message: ThreadMessage,
 ) -> None:
     sources = pipeline_state.modalities_from_message(message)
@@ -75,7 +72,7 @@ async def _publish_parse_jobs(
         envelope = MessageEnvelope(
             event=PipelineEvent.PARSE_REQUEST,
             project_id=project_id,
-            pipeline_id=pipeline_id,
+            pipeline_id=pipeline_run_id,
             payload=payload,
         )
         await broker.publish(queue_name, envelope)

@@ -2,8 +2,6 @@
 
 import unittest
 from datetime import datetime, timezone
-from uuid import uuid4
-
 from app.schemas.auth import AuthResponse, RegisterRequest
 from app.schemas.project import CreateProjectRequest, ProjectResponse
 from app.schemas.thread import CreateThreadResponse, ThreadMessageResponse
@@ -39,29 +37,28 @@ class SchemaSerializationTests(unittest.TestCase):
         self.assertIn("updatedAt", payload)
 
     def test_create_thread_response_includes_pipeline_fields(self) -> None:
-        pipeline_id = uuid4()
+        pipeline_id = 42
         payload = CreateThreadResponse(
             message_id=7,
             created_at=datetime(2026, 5, 17, 12, 0, tzinfo=timezone.utc),
             pipeline_id=pipeline_id,
             status=ProjectStatus.running,
         ).model_dump(mode="json", by_alias=True)
-        self.assertEqual(payload["pipelineId"], str(pipeline_id))
+        self.assertEqual(payload["pipelineId"], pipeline_id)
         self.assertEqual(payload["status"], "running")
 
     def test_thread_message_response_pipeline_id_nullable(self) -> None:
-        pipeline_id = uuid4()
         msg = ThreadMessageResponse(
             id=1,
             role=MessageRole.user,
             content="hello",
             input_image_urls=["http://minio/img.png"],
             input_urls=["https://example.com"],
-            pipeline_id=pipeline_id,
+            pipeline_id=42,
             created_at=datetime(2026, 5, 17, 12, 0, tzinfo=timezone.utc),
         )
         payload = msg.model_dump(mode="json", by_alias=True)
-        self.assertEqual(payload["pipelineId"], str(pipeline_id))
+        self.assertEqual(payload["pipelineId"], 42)
         self.assertEqual(payload["inputImageUrls"], ["http://minio/img.png"])
 
     def test_create_project_request_validation(self) -> None:

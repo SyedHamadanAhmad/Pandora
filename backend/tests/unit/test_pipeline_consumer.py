@@ -2,7 +2,6 @@
 
 import unittest
 from unittest.mock import AsyncMock, MagicMock
-from uuid import uuid4
 
 from app.services import pipeline_state
 from app.services.pipeline_consumer import (
@@ -19,7 +18,7 @@ class MergeParseResultsTests(unittest.TestCase):
     def test_merge_combines_sources(self) -> None:
         state = PipelineState(
             project_id=1,
-            pipeline_id=uuid4(),
+            pipeline_id=1,
             parse_results={
                 "text": {"source": "text", "data": {"content": "hi"}},
                 "url": {"source": "url", "data": {"urls": []}},
@@ -32,7 +31,7 @@ class MergeParseResultsTests(unittest.TestCase):
     def test_merge_collects_timeout_gaps(self) -> None:
         state = PipelineState(
             project_id=1,
-            pipeline_id=uuid4(),
+            pipeline_id=1,
             parse_results={
                 "text": {"source": "text", "data": None, "error": "timeout"},
             },
@@ -49,7 +48,7 @@ class TriggerBriefWorkTests(unittest.IsolatedAsyncioTestCase):
         pipeline_state.pipeline_states.clear()
 
     async def test_trigger_brief_work_publishes_request(self) -> None:
-        pipeline_id = uuid4()
+        pipeline_id = 42
         state = PipelineState(
             project_id=42,
             pipeline_id=pipeline_id,
@@ -69,7 +68,7 @@ class TriggerBriefWorkTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("text", envelope.payload["sources"])
 
     async def test_parses_complete_callback_delegates_to_trigger(self) -> None:
-        pipeline_id = uuid4()
+        pipeline_id = 42
         state = PipelineState(
             project_id=1,
             pipeline_id=pipeline_id,

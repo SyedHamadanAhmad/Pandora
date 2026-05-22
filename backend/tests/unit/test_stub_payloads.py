@@ -25,7 +25,7 @@ class StubPayloadTests(unittest.TestCase):
         work = MessageEnvelope(
             event=PipelineEvent.PARSE_REQUEST,
             project_id=1,
-            pipeline_id=uuid4(),
+            pipeline_id=1,
             payload={"content": "hello"},
         )
         data = _parse_data("text", work)
@@ -36,7 +36,7 @@ class StubPayloadTests(unittest.TestCase):
         work = MessageEnvelope(
             event=PipelineEvent.SCHEMA_REQUEST,
             project_id=1,
-            pipeline_id=uuid4(),
+            pipeline_id=1,
             payload={},
         )
         payload = _schema_ready_payload(work)
@@ -48,7 +48,7 @@ class StubPayloadTests(unittest.TestCase):
         work = MessageEnvelope(
             event=PipelineEvent.VERIFICATION_COMPLETE,
             project_id=1,
-            pipeline_id=uuid4(),
+            pipeline_id=1,
             payload={},
         )
         payload = _verification_complete_payload(work)
@@ -58,7 +58,7 @@ class StubPayloadTests(unittest.TestCase):
         work = MessageEnvelope(
             event=PipelineEvent.COMPONENT_VALIDATED,
             project_id=1,
-            pipeline_id=uuid4(),
+            pipeline_id=1,
             payload={"spec": {"name": "Button"}},
         )
         payload = _component_validated_payload(work)
@@ -69,7 +69,7 @@ class StubPayloadTests(unittest.TestCase):
         work = MessageEnvelope(
             event=PipelineEvent.BRIEF_REQUEST,
             project_id=1,
-            pipeline_id=uuid4(),
+            pipeline_id=1,
             payload={"input_gaps": ["text:timeout"]},
         )
         payload = _brief_ready_payload(work)

@@ -1,4 +1,4 @@
-"""In-memory pipeline run coordination (Tech Spec §15.4 POC)."""
+"""Pipeline run coordination — durable Postgres rows + in-process cache (Phase 0)."""
 
 from __future__ import annotations
 
@@ -7,7 +7,6 @@ import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Any
-from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,6 +15,7 @@ from app.database import async_session
 from app.models.component import Component
 from app.models.design_brief import DesignBrief
 from app.models.design_schema import DesignSchema
+from app.models.pipeline_run import PipelineRun
 from app.models.project import Project
 from app.models.thread_message import ThreadMessage
 from pandora_shared.enums import ComponentStatus, ProjectStatus
@@ -23,11 +23,9 @@ from pandora_shared.payloads import ParseResultPayload
 
 logger = logging.getLogger(__name__)
 
-# Default watchdog for text/image (seconds).
-PARSE_TIMEOUT_SECONDS = 150
+PipelineRunId = int
 
-# URL parse often exceeds a flat ceiling: crawl + one LLM per URL + optional multi-URL synthesis
-# in ``ParseUrlAgent`` — see ``_parse_timeout_watch`` / ``_parse_timeout_delay``.
+PARSE_TIMEOUT_SECONDS = 150
 PARSE_URL_TIMEOUT_FLOOR = 120
 PARSE_URL_TIMEOUT_PER_URL = 100
 PARSE_URL_TIMEOUT_SYNTHESIS = 90
@@ -40,14 +38,15 @@ OnParsesComplete = Callable[["PipelineState"], Awaitable[None]]
 
 
 class PipelineStateNotFoundError(KeyError):
-    """Raised when no in-memory state exists for a pipeline_id."""
+    """Raised when no pipeline run exists for the given id."""
 
 
 @dataclass
 class PipelineState:
+    """Working view of a row in ``pipeline_runs`` (``pipeline_id`` == ``pipeline_runs.id``)."""
+
     project_id: int
-    pipeline_id: UUID
-    # len(thread URLs); scales URL parse watchdog (crawl + LLM per URL + synthesis).
+    pipeline_id: PipelineRunId
     url_count: int = 0
     expected_components: int = 0
     resolved_components: int = 0
@@ -56,17 +55,17 @@ class PipelineState:
     parse_received: int = 0
     parse_pending: set[str] = field(default_factory=set)
     revision_round: int = 0
-    # Set when holism verification finishes (post-revision); storybook regen skips holism gates.
     run_complete: bool = False
+    brief_requested: bool = False
     _timeout_tasks: list[asyncio.Task[None]] = field(default_factory=list, repr=False, compare=False)
     _on_parses_complete: OnParsesComplete | None = field(default=None, repr=False, compare=False)
 
 
-pipeline_states: dict[UUID, PipelineState] = {}
+# In-process cache: timeouts, callbacks, and hot-path reads. Source of truth is ``pipeline_runs``.
+pipeline_states: dict[PipelineRunId, PipelineState] = {}
 
 
 def modalities_from_message(message: ThreadMessage) -> set[ParseSource]:
-    """Derive which parse workers to run from thread message inputs."""
     sources: set[ParseSource] = set()
     if message.content and message.content.strip():
         sources.add("text")
@@ -77,72 +76,144 @@ def modalities_from_message(message: ThreadMessage) -> set[ParseSource]:
     return sources
 
 
-def get_state(pipeline_id: UUID) -> PipelineState:
-    """Return in-memory state for a pipeline run."""
-    try:
-        return pipeline_states[pipeline_id]
-    except KeyError as exc:
-        raise PipelineStateNotFoundError(pipeline_id) from exc
+def _state_from_run(
+    run: PipelineRun,
+    *,
+    on_parses_complete: OnParsesComplete | None = None,
+) -> PipelineState:
+    pending = run.parse_pending
+    if isinstance(pending, list):
+        pending_set = set(pending)
+    else:
+        pending_set = set()
+    results = run.parse_results if isinstance(run.parse_results, dict) else {}
+    return PipelineState(
+        project_id=run.project_id,
+        pipeline_id=run.id,
+        url_count=run.url_count,
+        expected_components=run.expected_components,
+        resolved_components=run.resolved_components,
+        parse_results=dict(results),
+        parse_expected=run.parse_expected,
+        parse_received=run.parse_received,
+        parse_pending=pending_set,
+        revision_round=run.revision_round,
+        run_complete=run.run_complete,
+        brief_requested=run.brief_requested,
+        _on_parses_complete=on_parses_complete,
+    )
 
 
-def remove_state(pipeline_id: UUID) -> None:
-    """Drop in-memory state (explicit cleanup only; not called on pipeline complete)."""
-    state = pipeline_states.pop(pipeline_id, None)
+def _apply_state_to_run(run: PipelineRun, state: PipelineState) -> None:
+    run.url_count = state.url_count
+    run.expected_components = state.expected_components
+    run.resolved_components = state.resolved_components
+    run.parse_results = dict(state.parse_results)
+    run.parse_expected = state.parse_expected
+    run.parse_received = state.parse_received
+    run.parse_pending = sorted(state.parse_pending)
+    run.revision_round = state.revision_round
+    run.run_complete = state.run_complete
+    run.brief_requested = state.brief_requested
+
+
+async def _load_into_cache(
+    session: AsyncSession,
+    pipeline_run_id: PipelineRunId,
+    *,
+    on_parses_complete: OnParsesComplete | None = None,
+) -> PipelineState:
+    run = await session.get(PipelineRun, pipeline_run_id)
+    if run is None:
+        raise PipelineStateNotFoundError(pipeline_run_id)
+    existing = pipeline_states.get(pipeline_run_id)
+    callback = on_parses_complete
+    if callback is None and existing is not None:
+        callback = existing._on_parses_complete
+    state = _state_from_run(run, on_parses_complete=callback)
+    if existing is not None:
+        state._timeout_tasks = existing._timeout_tasks
+    pipeline_states[pipeline_run_id] = state
+    return state
+
+
+async def get_state(
+    pipeline_run_id: PipelineRunId,
+    *,
+    session: AsyncSession | None = None,
+) -> PipelineState:
+    cached = pipeline_states.get(pipeline_run_id)
+    if cached is not None:
+        return cached
+    if session is not None:
+        return await _load_into_cache(session, pipeline_run_id)
+    async with async_session() as db:
+        return await _load_into_cache(db, pipeline_run_id)
+
+
+async def persist_state(state: PipelineState, session: AsyncSession) -> None:
+    run = await session.get(PipelineRun, state.pipeline_id)
+    if run is None:
+        raise PipelineStateNotFoundError(state.pipeline_id)
+    _apply_state_to_run(run, state)
+    await session.flush()
+    pipeline_states[state.pipeline_id] = state
+
+
+def remove_state(pipeline_run_id: PipelineRunId) -> None:
+    state = pipeline_states.pop(pipeline_run_id, None)
     if state is not None:
         for task in state._timeout_tasks:
             if not task.done():
                 task.cancel()
 
 
-def init_state_from_thread(
+async def init_state_from_thread(
+    session: AsyncSession,
     project_id: int,
-    pipeline_id: UUID,
     message: ThreadMessage,
     *,
     on_parses_complete: OnParsesComplete | None = None,
 ) -> PipelineState:
-    """
-    Seed counters from thread inputs and schedule per-source parse timeouts.
-
-    ``on_parses_complete`` is invoked when ``parse_received >= parse_expected``
-    (including synthetic timeout results). Wired by the pipeline consumer in Step 5.
-    """
+    """Insert ``pipeline_runs`` row and seed in-memory cache."""
     sources = modalities_from_message(message)
-    url_count = len(message.input_urls or [])
-    state = PipelineState(
+    run = PipelineRun(
         project_id=project_id,
-        pipeline_id=pipeline_id,
-        url_count=url_count,
+        thread_message_id=message.id,
+        url_count=len(message.input_urls or []),
         parse_expected=len(sources),
-        parse_pending=set(sources),
-        _on_parses_complete=on_parses_complete,
+        parse_received=0,
+        parse_pending=sorted(sources),
+        parse_results={},
     )
-    pipeline_states[pipeline_id] = state
+    session.add(run)
+    await session.flush()
+
+    message.pipeline_run_id = run.id
+    state = _state_from_run(run, on_parses_complete=on_parses_complete)
+    pipeline_states[run.id] = state
     return state
 
 
-def schedule_parse_timeouts(pipeline_id: UUID) -> None:
-    """Start per-source parse watchdog tasks (requires running event loop)."""
-    state = get_state(pipeline_id)
+def schedule_parse_timeouts(pipeline_run_id: PipelineRunId) -> None:
+    state = pipeline_states.get(pipeline_run_id)
+    if state is None:
+        raise PipelineStateNotFoundError(pipeline_run_id)
     for source in list(state.parse_pending):
         task = asyncio.create_task(
-            _parse_timeout_watch(pipeline_id, source),
-            name=f"parse-timeout-{pipeline_id}-{source}",
+            _parse_timeout_watch(pipeline_run_id, source),
+            name=f"parse-timeout-{pipeline_run_id}-{source}",
         )
         state._timeout_tasks.append(task)
 
 
-def record_parse_result(
-    pipeline_id: UUID,
+async def record_parse_result(
+    session: AsyncSession,
+    pipeline_run_id: PipelineRunId,
     source: ParseSource,
     payload: dict[str, Any],
 ) -> bool:
-    """
-    Store one parse result and bump counters.
-
-    Returns True when all expected parses are in (ready for brief trigger).
-    """
-    state = get_state(pipeline_id)
+    state = await get_state(pipeline_run_id, session=session)
     if source not in PARSE_SOURCES:
         raise ValueError(f"Invalid parse source: {source}")
     if source not in state.parse_pending:
@@ -151,6 +222,7 @@ def record_parse_result(
     state.parse_results[source] = payload
     state.parse_received += 1
     state.parse_pending.discard(source)
+    await persist_state(state, session)
     return state.parse_received >= state.parse_expected
 
 
@@ -158,142 +230,168 @@ def synthetic_timeout_payload(source: ParseSource) -> dict[str, Any]:
     return ParseResultPayload(source=source, data=None, error="timeout").model_dump()
 
 
-async def apply_parse_timeout(pipeline_id: UUID, source: ParseSource) -> bool:
-    """Inject a synthetic timeout result if the source is still pending."""
-    state = pipeline_states.get(pipeline_id)
+async def apply_parse_timeout(pipeline_run_id: PipelineRunId, source: ParseSource) -> bool:
+    state = pipeline_states.get(pipeline_run_id)
     if state is None or source not in state.parse_pending:
         return False
 
-    complete = record_parse_result(pipeline_id, source, synthetic_timeout_payload(source))
+    async with async_session() as db:
+        complete = await record_parse_result(
+            db,
+            pipeline_run_id,
+            source,
+            synthetic_timeout_payload(source),
+        )
+        await db.commit()
+
     if complete and state._on_parses_complete is not None:
         await state._on_parses_complete(state)
     return complete
 
 
-def _parse_timeout_delay_seconds(pipeline_id: UUID, source: ParseSource) -> float:
-    """Wall-clock budget before synthetic timeout for this modality."""
+def _parse_timeout_delay_seconds(pipeline_run_id: PipelineRunId, source: ParseSource) -> float:
     if source != "url":
         return float(PARSE_TIMEOUT_SECONDS)
-    state = get_state(pipeline_id)
+    state = pipeline_states.get(pipeline_run_id)
+    if state is None:
+        return float(PARSE_TIMEOUT_SECONDS)
     n = max(1, state.url_count)
-    # One crawl+LLM budget per URL; extra pass when multi-URL rollup synthesizes.
     url_budget = float(PARSE_URL_TIMEOUT_FLOOR + PARSE_URL_TIMEOUT_PER_URL * n)
     if n > 1:
         url_budget += float(PARSE_URL_TIMEOUT_SYNTHESIS)
     return max(float(PARSE_TIMEOUT_SECONDS), url_budget)
 
 
-async def _parse_timeout_watch(pipeline_id: UUID, source: ParseSource) -> None:
+async def _parse_timeout_watch(pipeline_run_id: PipelineRunId, source: ParseSource) -> None:
     try:
-        delay = _parse_timeout_delay_seconds(pipeline_id, source)
+        delay = _parse_timeout_delay_seconds(pipeline_run_id, source)
         await asyncio.sleep(delay)
-        await apply_parse_timeout(pipeline_id, source)
+        await apply_parse_timeout(pipeline_run_id, source)
     except asyncio.CancelledError:
         raise
 
 
-async def notify_parses_complete_if_ready(pipeline_id: UUID) -> None:
-    """Call the registered parses-complete hook when counters are satisfied."""
-    state = pipeline_states.get(pipeline_id)
+async def notify_parses_complete_if_ready(pipeline_run_id: PipelineRunId) -> None:
+    state = pipeline_states.get(pipeline_run_id)
     if state is None:
-        return
+        state = await get_state(pipeline_run_id)
     if state.parse_received >= state.parse_expected and state._on_parses_complete is not None:
         await state._on_parses_complete(state)
 
 
-async def recover_running_projects() -> None:
-    """
-    Best-effort rebuild of in-memory state for projects left ``running`` after API restart.
+async def mark_brief_requested(state: PipelineState, session: AsyncSession) -> None:
+    state.brief_requested = True
+    await persist_state(state, session)
 
-    Cannot restore interim ``parse_results`` blobs; parse phase is marked complete if a
-    brief already exists, otherwise pending sources are re-armed with timeout watchers.
-    """
+
+async def update_run_fields(
+    session: AsyncSession,
+    pipeline_run_id: PipelineRunId,
+    **fields: Any,
+) -> PipelineState:
+    state = await get_state(pipeline_run_id, session=session)
+    for key, value in fields.items():
+        if hasattr(state, key) and not key.startswith("_"):
+            setattr(state, key, value)
+    await persist_state(state, session)
+    return state
+
+
+async def recover_running_projects(
+    *,
+    on_parses_complete: OnParsesComplete | None = None,
+    reconcile_brief: Callable[[PipelineState], Awaitable[None]] | None = None,
+) -> None:
+    """Reload ``pipeline_runs`` for ``running`` projects after API restart."""
     async with async_session() as db:
         result = await db.execute(
-            select(Project).where(Project.status == ProjectStatus.running)
+            select(PipelineRun)
+            .join(Project, PipelineRun.project_id == Project.id)
+            .where(Project.status == ProjectStatus.running)
         )
-        projects = result.scalars().all()
-        for project in projects:
-            await _recover_project(db, project)
+        runs = result.scalars().all()
+        for run in runs:
+            if run.id in pipeline_states:
+                continue
+            await _recover_run(
+                db,
+                run,
+                on_parses_complete=on_parses_complete,
+                reconcile_brief=reconcile_brief,
+            )
 
 
-async def _recover_project(db: AsyncSession, project: Project) -> None:
-    message = await _latest_pipeline_message(db, project.id)
-    if message is None or message.pipeline_id is None:
+async def _recover_run(
+    db: AsyncSession,
+    run: PipelineRun,
+    *,
+    on_parses_complete: OnParsesComplete | None,
+    reconcile_brief: Callable[[PipelineState], Awaitable[None]] | None,
+) -> None:
+    message = await db.get(ThreadMessage, run.thread_message_id)
+    if message is None:
         logger.warning(
-            "running project %s has no thread message with pipeline_id; skipping recovery",
-            project.id,
+            "pipeline_run %s missing thread_message_id=%s; skipping",
+            run.id,
+            run.thread_message_id,
         )
         return
 
-    pipeline_id = message.pipeline_id
-    if pipeline_id in pipeline_states:
-        return
-
-    sources = modalities_from_message(message)
-    url_count = len(message.input_urls or [])
-    state = PipelineState(
-        project_id=project.id,
-        pipeline_id=pipeline_id,
-        url_count=url_count,
-        parse_expected=len(sources),
-    )
-
-    brief = await db.scalar(
-        select(DesignBrief).where(DesignBrief.project_id == project.id)
-    )
-    if brief is not None:
-        state.parse_received = state.parse_expected
-        state.parse_pending = set()
-    else:
-        state.parse_pending = set(sources)
+    brief = await db.scalar(select(DesignBrief).where(DesignBrief.project_id == run.project_id))
+    if brief is not None and run.parse_received < run.parse_expected:
+        run.parse_received = run.parse_expected
+        run.parse_pending = []
+        await db.flush()
 
     schema = await db.scalar(
         select(DesignSchema)
-        .where(DesignSchema.project_id == project.id)
+        .where(DesignSchema.project_id == run.project_id)
         .order_by(DesignSchema.created_at.desc())
         .limit(1)
     )
     components = (
-        await db.scalars(select(Component).where(Component.project_id == project.id))
+        await db.scalars(select(Component).where(Component.project_id == run.project_id))
     ).all()
 
     if components:
-        state.expected_components = len(components)
-        state.resolved_components = sum(
+        run.expected_components = len(components)
+        run.resolved_components = sum(
             1
-            for component in components
-            if component.status in (ComponentStatus.validated, ComponentStatus.failed)
+            for c in components
+            if c.status in (ComponentStatus.validated, ComponentStatus.failed)
         )
-        state.revision_round = max((c.revision_round for c in components), default=0)
+        run.revision_round = max((c.revision_round for c in components), default=0)
     elif schema is not None and schema.component_specs:
-        state.expected_components = len(schema.component_specs)
+        run.expected_components = len(schema.component_specs)
 
-    pipeline_states[pipeline_id] = state
+    project_status = await db.scalar(
+        select(Project.status).where(Project.id == run.project_id)
+    )
+    if project_status == ProjectStatus.completed:
+        run.run_complete = True
+
+    await db.flush()
+
+    state = _state_from_run(run, on_parses_complete=on_parses_complete)
+    pipeline_states[run.id] = state
+
     if state.parse_pending:
-        schedule_parse_timeouts(pipeline_id)
+        schedule_parse_timeouts(run.id)
+
+    if (
+        reconcile_brief is not None
+        and state.parse_received >= state.parse_expected
+        and not state.brief_requested
+        and brief is None
+    ):
+        await reconcile_brief(state)
+
     logger.info(
-        "recovered pipeline state project_id=%s pipeline_id=%s parse=%s/%s components=%s/%s",
-        project.id,
-        pipeline_id,
+        "recovered pipeline_run id=%s project_id=%s parse=%s/%s components=%s/%s",
+        run.id,
+        run.project_id,
         state.parse_received,
         state.parse_expected,
         state.resolved_components,
         state.expected_components,
     )
-
-
-async def _latest_pipeline_message(
-    db: AsyncSession,
-    project_id: int,
-) -> ThreadMessage | None:
-    result = await db.execute(
-        select(ThreadMessage)
-        .where(
-            ThreadMessage.project_id == project_id,
-            ThreadMessage.pipeline_id.isnot(None),
-        )
-        .order_by(ThreadMessage.created_at.desc())
-        .limit(1)
-    )
-    return result.scalar_one_or_none()

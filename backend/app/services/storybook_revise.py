@@ -12,7 +12,7 @@ from app.services import sse_service
 from app.services.message_broker import MessageBroker
 from app.services.storybook_publish import (
     build_component_generate_envelope,
-    resolve_latest_pipeline_id,
+    resolve_latest_pipeline_run_id,
 )
 from app.services.storybook_tokens import assert_storybook_idle, require_design_schema
 from pandora_shared.enums import ComponentStatus
@@ -62,7 +62,7 @@ async def revise_component(
         )
 
     schema = await require_design_schema(session, project.id)
-    pipeline_id = await resolve_latest_pipeline_id(session, project.id)
+    pipeline_run_id = await resolve_latest_pipeline_run_id(session, project.id)
 
     component.revision_instruction = text
     component.status = ComponentStatus.generating
@@ -70,7 +70,7 @@ async def revise_component(
 
     envelope = build_component_generate_envelope(
         project_id=project.id,
-        pipeline_id=pipeline_id,
+        pipeline_id=pipeline_run_id,
         component=component,
         schema=schema,
         design_tokens=schema.design_tokens,

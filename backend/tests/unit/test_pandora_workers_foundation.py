@@ -48,7 +48,7 @@ class BaseAgentHandlerTests(unittest.IsolatedAsyncioTestCase):
         message.body = MessageEnvelope(
             event=PipelineEvent.PARSE_REQUEST,
             project_id=1,
-            pipeline_id=uuid4(),
+            pipeline_id=42,
             payload={"content": "hi"},
         ).model_dump_json().encode()
         channel = MagicMock()
@@ -130,7 +130,7 @@ class ValidationTests(unittest.IsolatedAsyncioTestCase):
 
 class EnvelopeHelperTests(unittest.TestCase):
     def test_build_result_preserves_pipeline_ids(self) -> None:
-        pipeline_id = uuid4()
+        pipeline_id = 99
         work = MessageEnvelope(
             event=PipelineEvent.BRIEF_REQUEST,
             project_id=42,

@@ -92,7 +92,7 @@ class SchemaFallbackTests(unittest.TestCase):
 class SchemaAgentTests(unittest.IsolatedAsyncioTestCase):
     async def test_publishes_schema_ready(self) -> None:
         agent = SchemaAgent()
-        pipeline_id = uuid4()
+        pipeline_id = 42
         work = MessageEnvelope(
             event=PipelineEvent.SCHEMA_REQUEST,
             project_id=3,
@@ -129,7 +129,7 @@ class SchemaAgentTests(unittest.IsolatedAsyncioTestCase):
         work = MessageEnvelope(
             event=PipelineEvent.SCHEMA_REQUEST,
             project_id=1,
-            pipeline_id=uuid4(),
+            pipeline_id=1,
             payload={
                 "color_tokens": {"primary": "#111"},
                 "component_list": ["Hero"],

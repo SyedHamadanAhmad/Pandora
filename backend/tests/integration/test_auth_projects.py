@@ -111,7 +111,7 @@ async def test_register_login_project_thread_and_minio(api_client: AsyncClient) 
             select(ThreadMessage).where(ThreadMessage.id == message_id)
         )
         message = row.scalar_one()
-        assert message.pipeline_id is not None
+        assert message.pipeline_run_id is not None
         assert message.input_image_urls
         object_key = _object_key_from_url(message.input_image_urls[0])
 

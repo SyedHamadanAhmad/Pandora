@@ -6,7 +6,6 @@ import asyncio
 import logging
 from collections.abc import Awaitable, Callable
 from typing import Any
-from uuid import UUID
 
 import aio_pika
 from aio_pika.abc import AbstractIncomingMessage, AbstractRobustConnection
@@ -33,7 +32,9 @@ from app.services.pipeline_state import (
     PipelineState,
     PipelineStateNotFoundError,
     get_state,
+    mark_brief_requested,
     notify_parses_complete_if_ready,
+    persist_state,
     pipeline_states,
     record_parse_result,
 )
@@ -74,7 +75,7 @@ COMPONENT_GENERATE_EVENT = "pandora.component.generate"
 
 Handler = Callable[[AbstractIncomingMessage, MessageBroker], Awaitable[None]]
 
-_pipeline_locks: dict[UUID, asyncio.Lock] = {}
+_pipeline_locks: dict[int, asyncio.Lock] = {}
 
 
 async def _nack_poison(message: AbstractIncomingMessage) -> None:
@@ -119,6 +120,13 @@ def merge_parse_results(state: PipelineState) -> dict[str, Any]:
 
 async def trigger_brief_work(state: PipelineState, broker: MessageBroker) -> None:
     """Publish one brief work message when all parses are collected (Slice A)."""
+    if state.brief_requested:
+        return
+
+    async with async_session() as db:
+        await mark_brief_requested(state, db)
+        await db.commit()
+
     envelope = MessageEnvelope(
         event=PipelineEvent.BRIEF_REQUEST,
         project_id=state.project_id,
@@ -127,7 +135,7 @@ async def trigger_brief_work(state: PipelineState, broker: MessageBroker) -> Non
     )
     await broker.publish(BRIEF_REQUEST, envelope)
     logger.info(
-        "published brief work project_id=%s pipeline_id=%s",
+        "published brief work project_id=%s pipeline_run_id=%s",
         state.project_id,
         state.pipeline_id,
     )
@@ -160,23 +168,30 @@ async def _handle_parse_results(
             await message.ack()
             return
 
-        get_state(envelope.pipeline_id)
+        await get_state(envelope.pipeline_id)
         source = parse_source_from_envelope(envelope)
         key = parse_results_idempotency_key(envelope.pipeline_id, source)
 
+        async def _apply_parse(session: AsyncSession) -> bool:
+            return await record_parse_result(
+                session,
+                envelope.pipeline_id,
+                source,
+                envelope.payload,
+            )
+
         async with async_session() as db:
-            status, _ = await run_idempotent(
+            status, complete = await run_idempotent(
                 db,
                 idempotency_key=key,
                 project_id=envelope.project_id,
-                handler=_noop_handler,
+                handler=_apply_parse,
             )
 
         if status == IdempotencyStatus.DUPLICATE:
             await message.ack()
             return
 
-        complete = record_parse_result(envelope.pipeline_id, source, envelope.payload)
         if complete:
             await notify_parses_complete_if_ready(envelope.pipeline_id)
 
@@ -205,7 +220,7 @@ async def _handle_brief_ready(
             await message.ack()
             return
 
-        get_state(envelope.pipeline_id)
+        await get_state(envelope.pipeline_id)
         key = idempotency_key_for_envelope(envelope)
 
         async with async_session() as db:
@@ -257,7 +272,7 @@ async def _handle_schema_ready(
             await message.ack()
             return
 
-        get_state(envelope.pipeline_id)
+        await get_state(envelope.pipeline_id)
         key = idempotency_key_for_envelope(envelope)
 
         async with async_session() as db:
@@ -272,9 +287,12 @@ async def _handle_schema_ready(
             await message.ack()
             return
 
-        state = get_state(envelope.pipeline_id)
-        state.expected_components = len(fanout)
-        state.resolved_components = 0
+        async with async_session() as db:
+            state = await get_state(envelope.pipeline_id, session=db)
+            state.expected_components = len(fanout)
+            state.resolved_components = 0
+            await persist_state(state, db)
+            await db.commit()
 
         for work in fanout:
             await broker.publish(COMPONENT_GENERATE, work)
@@ -354,8 +372,13 @@ async def _handle_component_outcome(
             )
 
         state = pipeline_states.get(envelope.pipeline_id)
+        if state is None:
+            try:
+                state = await get_state(envelope.pipeline_id)
+            except PipelineStateNotFoundError:
+                state = None
         if state is None or state.run_complete:
-            # Post-pipeline (storybook regen) or state lost after API restart (Redis later).
+            # Post-pipeline storybook regen, or run finished (``run_complete``).
             if status != IdempotencyStatus.DUPLICATE:
                 _emit_project_event(
                     envelope.project_id,
@@ -407,7 +430,7 @@ async def _handle_verification_complete(
             await message.ack()
             return
 
-        state = get_state(envelope.pipeline_id)
+        state = await get_state(envelope.pipeline_id)
         verification_pass = state.revision_round
         key = build_idempotency_key(
             envelope.pipeline_id,
@@ -433,10 +456,11 @@ async def _handle_verification_complete(
             state.revision_round += 1
             async with async_session() as db:
                 await _fanout_revision_generates(db, envelope, state, broker)
+                lock = _pipeline_locks.setdefault(state.pipeline_id, asyncio.Lock())
+                async with lock:
+                    state.resolved_components = 0
+                await persist_state(state, db)
                 await db.commit()
-            lock = _pipeline_locks.setdefault(state.pipeline_id, asyncio.Lock())
-            async with lock:
-                state.resolved_components = 0
             _emit_project_event(
                 envelope.project_id,
                 {
@@ -456,10 +480,13 @@ async def _handle_verification_complete(
                 )
             if status == IdempotencyStatus.DUPLICATE:
                 state.run_complete = True
+                async with async_session() as db:
+                    await persist_state(state, db)
+                    await db.commit()
                 await message.ack()
                 return
 
-            _finalize_pipeline_run(state, envelope.project_id, envelope.pipeline_id)
+            await _finalize_pipeline_run(state, envelope.project_id, envelope.pipeline_id)
         await message.ack()
     except PipelineStateNotFoundError:
         logger.error("verification complete for unknown pipeline_id")
@@ -591,7 +618,11 @@ async def _increment_resolved_and_check_gate(state: PipelineState) -> bool:
     lock = _pipeline_locks.setdefault(state.pipeline_id, asyncio.Lock())
     async with lock:
         state.resolved_components += 1
-        return state.resolved_components >= state.expected_components
+        gate_open = state.resolved_components >= state.expected_components
+    async with async_session() as db:
+        await persist_state(state, db)
+        await db.commit()
+    return gate_open
 
 
 async def _noop_handler(_session: AsyncSession) -> None:
@@ -610,19 +641,22 @@ async def _apply_pipeline_complete(
     await session.flush()
 
 
-def _finalize_pipeline_run(
+async def _finalize_pipeline_run(
     state: PipelineState,
     project_id: int,
-    pipeline_id: UUID,
+    pipeline_run_id: int,
 ) -> None:
-    """In-memory gate + SSE after verification pass (no showcase step)."""
+    """Persist ``run_complete`` and emit ``pipeline_complete`` after verification pass."""
     state.run_complete = True
+    async with async_session() as db:
+        await persist_state(state, db)
+        await db.commit()
     _emit_project_event(
         project_id,
         {
             "type": PIPELINE_COMPLETE,
             "projectId": project_id,
-            "pipelineId": str(pipeline_id),
+            "pipelineId": str(pipeline_run_id),
         },
     )
 
@@ -866,6 +900,7 @@ async def _fanout_revision_generates(
     revision_round = state.revision_round
     state.expected_components = len(components)
     state.resolved_components = 0
+    await persist_state(state, session)
 
     if schema is None:
         return

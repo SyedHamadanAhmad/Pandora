@@ -67,7 +67,7 @@ class BriefHeuristicTests(unittest.TestCase):
 class BriefAgentTests(unittest.IsolatedAsyncioTestCase):
     async def test_publishes_brief_ready(self) -> None:
         agent = BriefAgent()
-        pipeline_id = uuid4()
+        pipeline_id = 42
         work = MessageEnvelope(
             event=PipelineEvent.BRIEF_REQUEST,
             project_id=7,
@@ -110,7 +110,7 @@ class BriefAgentTests(unittest.IsolatedAsyncioTestCase):
         work = MessageEnvelope(
             event=PipelineEvent.BRIEF_REQUEST,
             project_id=1,
-            pipeline_id=uuid4(),
+            pipeline_id=1,
             payload={
                 "sources": {
                     "url": {

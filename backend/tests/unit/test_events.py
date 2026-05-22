@@ -23,7 +23,7 @@ class EventHelperTests(unittest.TestCase):
         envelope = MessageEnvelope(
             event=PipelineEvent.PARSE_RESULTS,
             project_id=1,
-            pipeline_id=uuid4(),
+            pipeline_id=1,
             payload=ParseResultPayload(source="image", data={"urls": []}).model_dump(),
         )
         self.assertEqual(parse_source_from_envelope(envelope), "image")
@@ -32,7 +32,7 @@ class EventHelperTests(unittest.TestCase):
         envelope = MessageEnvelope(
             event=PipelineEvent.BRIEF_READY,
             project_id=1,
-            pipeline_id=uuid4(),
+            pipeline_id=1,
             payload={},
         )
         with self.assertRaises(ValueError):

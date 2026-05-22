@@ -38,7 +38,7 @@ class ParseTextAgentTests(unittest.IsolatedAsyncioTestCase):
         work = MessageEnvelope(
             event=PipelineEvent.PARSE_REQUEST,
             project_id=1,
-            pipeline_id=uuid4(),
+            pipeline_id=1,
             payload={"content": "Build a fintech dashboard"},
         )
         with patch(
@@ -63,7 +63,7 @@ class ParseUrlAgentTests(unittest.IsolatedAsyncioTestCase):
         work = MessageEnvelope(
             event=PipelineEvent.PARSE_REQUEST,
             project_id=2,
-            pipeline_id=uuid4(),
+            pipeline_id=1,
             payload={"urls": ["https://example.com"]},
         )
         pages = [
@@ -111,7 +111,7 @@ class ParseUrlAgentTests(unittest.IsolatedAsyncioTestCase):
         work = MessageEnvelope(
             event=PipelineEvent.PARSE_REQUEST,
             project_id=5,
-            pipeline_id=uuid4(),
+            pipeline_id=1,
             payload={"urls": ["https://a.com", "https://b.com"]},
         )
         pages = [
@@ -169,7 +169,7 @@ class ParseUrlAgentTests(unittest.IsolatedAsyncioTestCase):
         work = MessageEnvelope(
             event=PipelineEvent.PARSE_REQUEST,
             project_id=3,
-            pipeline_id=uuid4(),
+            pipeline_id=1,
             payload={"urls": ["https://example.com"]},
         )
         with patch(
@@ -194,7 +194,7 @@ class ParseImageAgentTests(unittest.IsolatedAsyncioTestCase):
         work = MessageEnvelope(
             event=PipelineEvent.PARSE_REQUEST,
             project_id=4,
-            pipeline_id=uuid4(),
+            pipeline_id=1,
             payload={"image_urls": ["http://minio:9000/pandora/test.png"]},
         )
         mock_response = AsyncMock()

@@ -49,7 +49,7 @@ class ReviseComponentServiceTests(unittest.IsolatedAsyncioTestCase):
         session.get = AsyncMock(return_value=component)
         broker = MagicMock()
         broker.publish = AsyncMock()
-        pipeline_id = uuid4()
+        pipeline_id = 42
 
         with (
             patch(
@@ -62,7 +62,7 @@ class ReviseComponentServiceTests(unittest.IsolatedAsyncioTestCase):
                 return_value=_FakeSchema(),
             ),
             patch(
-                "app.services.storybook_revise.resolve_latest_pipeline_id",
+                "app.services.storybook_revise.resolve_latest_pipeline_run_id",
                 new_callable=AsyncMock,
                 return_value=pipeline_id,
             ),

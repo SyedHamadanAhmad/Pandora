@@ -8,9 +8,8 @@ import logging
 from fastapi import FastAPI
 
 from app import rabbitmq
-from app.services import pipeline_consumer
+from app.services import pipeline_consumer, pipeline_state
 from app.services.message_broker import MessageBroker
-from app.services.pipeline_state import recover_running_projects
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +48,15 @@ async def start_pipeline_runtime(app: FastAPI) -> None:
     app.state.rabbitmq_publish_channel = publish_channel
     app.state.message_broker = broker
 
-    await recover_running_projects()
+    callback = pipeline_consumer.make_parses_complete_callback(broker)
+
+    async def reconcile_brief(state: pipeline_state.PipelineState) -> None:
+        await pipeline_consumer.trigger_brief_work(state, broker)
+
+    await pipeline_state.recover_running_projects(
+        on_parses_complete=callback,
+        reconcile_brief=reconcile_brief,
+    )
     pipeline_consumer.wire_parses_complete_callbacks(broker)
 
     consumer_task = asyncio.create_task(
