@@ -6,8 +6,6 @@ import unittest
 from uuid import uuid4
 
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import text
-
 from app.database import async_session
 from app.main import app
 from app.models.component import Component
@@ -17,26 +15,7 @@ from app.models.project import Project
 from pandora_shared.enums import ComponentStatus, ProjectStatus
 
 
-def _postgres_available() -> bool:
-    import asyncio
-
-    async def _ping() -> bool:
-        try:
-            async with async_session() as db:
-                await db.execute(text("SELECT 1"))
-            return True
-        except Exception:
-            return False
-
-    return asyncio.run(_ping())
-
-
 class StorybookRouteTests(unittest.IsolatedAsyncioTestCase):
-    @classmethod
-    def setUpClass(cls) -> None:
-        if not _postgres_available():
-            raise unittest.SkipTest("Postgres not available")
-
     async def _register_and_login(self, client: AsyncClient) -> int:
         email = f"storybook-{uuid4()}@example.com"
         password = "secret123"

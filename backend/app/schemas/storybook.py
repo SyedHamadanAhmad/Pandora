@@ -67,3 +67,32 @@ class ComponentDetailResponse(ApiModel):
     spec: dict[str, Any] = Field(default_factory=dict)
     design_tokens: dict[str, Any] = Field(default_factory=dict)
     global_config: dict[str, Any] = Field(default_factory=dict)
+
+
+class PatchTokensRequest(ApiModel):
+    design_tokens: dict[str, Any] = Field(default_factory=dict)
+
+
+class TokenPatchResponse(ApiModel):
+    design_tokens: dict[str, Any] = Field(default_factory=dict)
+
+
+class SuggestTokensRequest(ApiModel):
+    message: str = Field(min_length=1, max_length=4096)
+
+
+class SuggestTokensResponse(ApiModel):
+    proposed_tokens: dict[str, Any] = Field(default_factory=dict)
+    design_tokens: dict[str, Any] = Field(default_factory=dict)
+    explanation: str
+
+
+class ApplyTokensRequest(ApiModel):
+    design_tokens: dict[str, Any] = Field(default_factory=dict)
+    regenerate_components: bool = False
+
+
+class ApplyTokensResponse(ApiModel):
+    design_tokens: dict[str, Any] = Field(default_factory=dict)
+    regenerate_queued: int = 0
+    status: str

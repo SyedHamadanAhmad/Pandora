@@ -5,7 +5,8 @@ from __future__ import annotations
 import unittest
 
 from app.schemas.storybook import StorybookSummary
-from app.services.storybook_service import _enriched_tokens, _summary_counts
+from app.services.storybook_service import _summary_counts
+from app.services.storybook_tokens import enriched_design_tokens
 from pandora_shared.enums import ComponentStatus
 
 
@@ -16,7 +17,7 @@ class _FakeComponent:
 
 class StorybookServiceTests(unittest.TestCase):
     def test_enriched_tokens_adds_on_primary(self) -> None:
-        tokens = _enriched_tokens({"primary": "#f97316"})
+        tokens = enriched_design_tokens({"primary": "#f97316"})
         self.assertEqual(tokens["on_primary"], "#ffffff")
         self.assertIn("surface", tokens)
 

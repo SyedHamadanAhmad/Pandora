@@ -43,7 +43,7 @@ class StreamRouteTests(unittest.IsolatedAsyncioTestCase):
         _test_app.dependency_overrides[get_current_user_id] = fake_user
 
         with patch(
-            "app.routers.stream._get_project_for_user",
+            "app.routers.stream.get_project_for_user",
             new_callable=AsyncMock,
             side_effect=deny_project,
         ):
@@ -63,7 +63,7 @@ class StreamRouteTests(unittest.IsolatedAsyncioTestCase):
         _test_app.dependency_overrides[get_current_user_id] = fake_user
 
         with patch(
-            "app.routers.stream._get_project_for_user",
+            "app.routers.stream.get_project_for_user",
             new_callable=AsyncMock,
             return_value=None,
         ):

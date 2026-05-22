@@ -12,7 +12,7 @@ from app.database import get_db
 from app.dependencies import get_message_broker
 from app.middleware.session_auth import get_current_user_id
 from app.models.thread_message import ThreadMessage
-from app.routers.projects import _get_project_for_user
+from app.services.project_access import get_project_for_user
 from app.schemas.thread import (
     CreateThreadResponse,
     ThreadListResponse,
@@ -65,7 +65,7 @@ async def create_thread_message(
     db: AsyncSession = Depends(get_db),
     broker: MessageBroker = Depends(get_message_broker),
 ) -> CreateThreadResponse:
-    project = await _get_project_for_user(db, project_id, user_id)
+    project = await get_project_for_user(db, project_id, user_id)
 
     input_urls = _parse_urls_field(urls)
     image_files = images or []
@@ -132,7 +132,7 @@ async def list_thread_messages(
     user_id: int = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
 ) -> ThreadListResponse:
-    await _get_project_for_user(db, project_id, user_id)
+    await get_project_for_user(db, project_id, user_id)
 
     result = await db.execute(
         select(ThreadMessage)
