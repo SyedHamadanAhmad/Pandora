@@ -96,3 +96,12 @@ class ApplyTokensResponse(ApiModel):
     design_tokens: dict[str, Any] = Field(default_factory=dict)
     regenerate_queued: int = 0
     status: str
+
+
+class ReviseComponentRequest(ApiModel):
+    message: str = Field(min_length=1, max_length=4096)
+
+
+class ReviseComponentResponse(ApiModel):
+    component_id: int
+    status: ComponentStatus

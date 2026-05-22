@@ -1,4 +1,4 @@
-"""Storybook routes (Phase 1a–1c read, Phase 1b token writes)."""
+"""Storybook routes (read, token writes, component revise)."""
 
 from __future__ import annotations
 
@@ -13,6 +13,8 @@ from app.schemas.storybook import (
     ApplyTokensResponse,
     ComponentDetailResponse,
     PatchTokensRequest,
+    ReviseComponentRequest,
+    ReviseComponentResponse,
     StorybookOverviewResponse,
     SuggestTokensRequest,
     SuggestTokensResponse,
@@ -21,6 +23,7 @@ from app.schemas.storybook import (
 from app.services.message_broker import MessageBroker
 from app.services.project_access import get_project_for_user
 from app.services.storybook_service import build_component_detail, build_storybook_overview
+from app.services.storybook_revise import revise_component
 from app.services.storybook_tokens import (
     apply_design_tokens,
     patch_design_tokens,
@@ -101,4 +104,27 @@ async def apply_storybook_tokens(
         body.design_tokens,
         regenerate_components=body.regenerate_components,
         broker=broker,
+    )
+
+
+@router.post(
+    "/{project_id}/components/{component_id}/revise",
+    response_model=ReviseComponentResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def revise_storybook_component(
+    project_id: int,
+    component_id: int,
+    body: ReviseComponentRequest,
+    user_id: int = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
+    broker: MessageBroker = Depends(get_message_broker),
+) -> ReviseComponentResponse:
+    project = await get_project_for_user(db, project_id, user_id)
+    return await revise_component(
+        db,
+        project,
+        component_id,
+        body.message,
+        broker,
     )
