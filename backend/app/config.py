@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     minio_access_key: str = "pandora"
     minio_secret_key: str = "pandora-secret"
     minio_bucket: str = "pandora-images"
-    deepseek_api_key: str = ""
+    openrouter_api_key: str = ""
 
 
 settings = Settings()

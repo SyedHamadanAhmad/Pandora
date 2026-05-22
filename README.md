@@ -13,7 +13,7 @@ Transforms multi-modal input (text, images, URLs) into a production-ready React 
 
 ```bash
 cp .env.example .env
-# Edit .env — set DEEPSEEK_API_KEY before running workers (Phase 4+)
+# Edit .env — set OPENROUTER_API_KEY before running workers (Phase 4+)
 
 make dev        # Start stack with hot reload (dev override)
 make migrate    # Run Alembic migrations (first run and after schema changes)

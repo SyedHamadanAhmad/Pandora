@@ -1,4 +1,4 @@
-"""DeepSeek LLM client (OpenAI-compatible async API)."""
+"""OpenRouter LLM client (OpenAI-compatible async API)."""
 
 from __future__ import annotations
 
@@ -9,21 +9,38 @@ from typing import Any
 
 from openai import AsyncOpenAI
 
-DEFAULT_MODEL = "deepseek-v4-pro"
-DEFAULT_BASE_URL = "https://api.deepseek.com"
+DEFAULT_MODEL = "qwen/qwen3.6-plus"
+DEFAULT_BASE_URL = "https://openrouter.ai/api/v1"
 _JSON_BLOCK_RE = re.compile(r"```(?:json)?\s*([\s\S]*?)\s*```", re.IGNORECASE)
 
 
+def llm_configured() -> bool:
+    """True when OPENROUTER_API_KEY is set."""
+    return bool(os.environ.get("OPENROUTER_API_KEY", "").strip())
+
+
+def openrouter_configured() -> bool:
+    """Alias for llm_configured."""
+    return llm_configured()
+
+
 def deepseek_configured() -> bool:
-    return bool(os.environ.get("DEEPSEEK_API_KEY", "").strip())
+    """Deprecated: use openrouter_configured()."""
+    return llm_configured()
 
 
 def _client() -> AsyncOpenAI:
-    api_key = os.environ.get("DEEPSEEK_API_KEY", "").strip()
+    api_key = os.environ.get("OPENROUTER_API_KEY", "").strip()
     if not api_key:
-        raise RuntimeError("DEEPSEEK_API_KEY is not set")
-    base_url = os.environ.get("DEEPSEEK_BASE_URL", DEFAULT_BASE_URL).strip() or DEFAULT_BASE_URL
+        raise RuntimeError("OPENROUTER_API_KEY is not set")
+    base_url = (
+        os.environ.get("OPENROUTER_BASE_URL", DEFAULT_BASE_URL).strip() or DEFAULT_BASE_URL
+    )
     return AsyncOpenAI(api_key=api_key, base_url=base_url)
+
+
+def _default_model() -> str:
+    return os.environ.get("OPENROUTER_MODEL", DEFAULT_MODEL).strip() or DEFAULT_MODEL
 
 
 def _extract_json(text: str) -> str:
@@ -38,13 +55,13 @@ async def complete_text(
     system: str,
     user: str,
     *,
-    model: str = DEFAULT_MODEL,
+    model: str | None = None,
     temperature: float = 0.2,
     timeout: float = 120.0,
 ) -> str:
     client = _client()
     response = await client.chat.completions.create(
-        model=model,
+        model=model or _default_model(),
         messages=[
             {"role": "system", "content": system},
             {"role": "user", "content": user},
@@ -62,7 +79,7 @@ async def complete_json(
     system: str,
     user: str,
     *,
-    model: str = DEFAULT_MODEL,
+    model: str | None = None,
     temperature: float = 0.2,
     timeout: float = 120.0,
 ) -> dict[str, Any]:

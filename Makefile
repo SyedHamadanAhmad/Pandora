@@ -118,7 +118,7 @@ phase2-gate: check-env
 	fi
 
 test-e2e:
-	@echo "E2E tests — implemented in Phase 9 (requires DEEPSEEK_API_KEY)"
+	@echo "E2E tests — implemented in Phase 9 (requires OPENROUTER_API_KEY)"
 
 scale-component-gen:
 	@test -n "$(n)" || (echo "Usage: make scale-component-gen n=5" && exit 1)

@@ -22,7 +22,7 @@ from pandora_shared.payloads import (  # noqa: E402
 )
 from pandora_workers.base_agent import BaseAgent  # noqa: E402
 from pandora_workers.envelopes import build_result  # noqa: E402
-from pandora_workers.llm import complete_json, deepseek_configured  # noqa: E402
+from pandora_workers.llm import complete_json, openrouter_configured  # noqa: E402
 from pandora_workers.prompts import render_prompt  # noqa: E402
 from pandora_workers.validation.feedback import run_tsc_and_eslint  # noqa: E402
 
@@ -76,14 +76,14 @@ class LlmTests(unittest.IsolatedAsyncioTestCase):
         fake_response.choices = [MagicMock(message=MagicMock(content='```json\n{"ok": true}\n```'))]
         client = MagicMock()
         client.chat.completions.create = AsyncMock(return_value=fake_response)
-        with patch.dict("os.environ", {"DEEPSEEK_API_KEY": "test-key"}):
+        with patch.dict("os.environ", {"OPENROUTER_API_KEY": "test-key"}):
             with patch("pandora_workers.llm._client", return_value=client):
                 result = await complete_json("sys", "user")
         self.assertEqual(result, {"ok": True})
 
-    def test_deepseek_configured_false_without_key(self) -> None:
-        with patch.dict("os.environ", {"DEEPSEEK_API_KEY": ""}, clear=False):
-            self.assertFalse(deepseek_configured())
+    def test_openrouter_configured_false_without_key(self) -> None:
+        with patch.dict("os.environ", {"OPENROUTER_API_KEY": ""}, clear=False):
+            self.assertFalse(openrouter_configured())
 
 
 class PayloadContractTests(unittest.TestCase):
