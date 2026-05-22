@@ -36,7 +36,6 @@ from app.services.pipeline_state import (
     notify_parses_complete_if_ready,
     pipeline_states,
     record_parse_result,
-    remove_state,
 )
 from app.services import sse_service
 from pandora_shared.enums import ComponentStatus, ProjectStatus
@@ -345,7 +344,6 @@ async def _handle_component_outcome(
             await _nack_poison(message)
             return
 
-        get_state(envelope.pipeline_id)
         key = idempotency_key_for_envelope(envelope)
 
         async with async_session() as db:
@@ -358,7 +356,22 @@ async def _handle_component_outcome(
                 ),
             )
 
-        state = get_state(envelope.pipeline_id)
+        state = pipeline_states.get(envelope.pipeline_id)
+        if state is None or state.run_complete:
+            # Post-pipeline (storybook regen) or state lost after API restart (Redis later).
+            if status != IdempotencyStatus.DUPLICATE:
+                _emit_project_event(
+                    envelope.project_id,
+                    {
+                        "type": sse_type,
+                        "projectId": envelope.project_id,
+                        "pipelineId": str(envelope.pipeline_id),
+                        "componentId": str(envelope.component_id),
+                        "componentName": component_name,
+                    },
+                )
+            await message.ack()
+            return
 
         if status == IdempotencyStatus.DUPLICATE:
             await _ensure_verification_if_gate_open(state, broker)
@@ -379,9 +392,6 @@ async def _handle_component_outcome(
         if gate_open:
             await _ensure_verification_if_gate_open(state, broker)
         await message.ack()
-    except PipelineStateNotFoundError:
-        logger.error("component outcome for unknown pipeline_id")
-        await _nack_poison(message)
     except ValidationError:
         logger.warning("invalid component outcome message; dropping")
         await _nack_poison(message)
@@ -505,8 +515,9 @@ async def _handle_showcase_ready(
             await message.ack()
             return
 
-        remove_state(envelope.pipeline_id)
-        _pipeline_locks.pop(envelope.pipeline_id, None)
+        state = pipeline_states.get(envelope.pipeline_id)
+        if state is not None:
+            state.run_complete = True
 
         _emit_project_event(
             envelope.project_id,

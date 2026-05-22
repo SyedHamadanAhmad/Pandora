@@ -56,6 +56,8 @@ class PipelineState:
     parse_received: int = 0
     parse_pending: set[str] = field(default_factory=set)
     revision_round: int = 0
+    # Set when showcase.ready is applied; storybook regen uses state but skips holism gates.
+    run_complete: bool = False
     _timeout_tasks: list[asyncio.Task[None]] = field(default_factory=list, repr=False, compare=False)
     _on_parses_complete: OnParsesComplete | None = field(default=None, repr=False, compare=False)
 
@@ -84,7 +86,7 @@ def get_state(pipeline_id: UUID) -> PipelineState:
 
 
 def remove_state(pipeline_id: UUID) -> None:
-    """Drop in-memory state when a run completes (consumer Slice G)."""
+    """Drop in-memory state (explicit cleanup only; not called on pipeline complete)."""
     state = pipeline_states.pop(pipeline_id, None)
     if state is not None:
         for task in state._timeout_tasks:

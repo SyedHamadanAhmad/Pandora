@@ -273,6 +273,141 @@ class ComponentOutcomeHandlerTests(unittest.IsolatedAsyncioTestCase):
         ensure_verification.assert_awaited_once_with(state, broker)
         message.ack.assert_awaited_once()
 
+    async def test_run_complete_skips_holism_gate(self) -> None:
+        """Pipeline state kept after showcase; storybook regen must not re-run verification."""
+        pipeline_id = uuid4()
+        state = PipelineState(
+            project_id=1,
+            pipeline_id=pipeline_id,
+            expected_components=3,
+            resolved_components=3,
+            run_complete=True,
+        )
+        pipeline_state.pipeline_states[pipeline_id] = state
+        envelope = _envelope(
+            event=PipelineEvent.COMPONENT_VALIDATED,
+            pipeline_id=pipeline_id,
+            component_id=1,
+        )
+        message = _message(envelope.model_dump(mode="json"))
+
+        with (
+            patch(
+                "app.services.pipeline_consumer.decode_envelope",
+                return_value=envelope,
+            ),
+            patch(
+                "app.services.pipeline_consumer.run_idempotent",
+                new_callable=AsyncMock,
+                return_value=(IdempotencyStatus.APPLIED, "Button"),
+            ),
+            patch(
+                "app.services.pipeline_consumer._increment_resolved_and_check_gate",
+                new_callable=AsyncMock,
+            ) as increment_gate,
+            patch(
+                "app.services.pipeline_consumer._ensure_verification_if_gate_open",
+                new_callable=AsyncMock,
+            ) as ensure_verification,
+            patch("app.services.pipeline_consumer._emit_project_event"),
+        ):
+            await _handle_component_outcome(
+                message,
+                MagicMock(),
+                expected_event=PipelineEvent.COMPONENT_VALIDATED,
+                sse_type="component_validated",
+            )
+
+        increment_gate.assert_not_awaited()
+        ensure_verification.assert_not_awaited()
+        message.ack.assert_awaited_once()
+
+    async def test_ad_hoc_outcome_without_pipeline_state_emits_sse_and_acks(self) -> None:
+        """State lost after API restart: still persist + SSE without holism gate."""
+        pipeline_id = uuid4()
+        envelope = _envelope(
+            event=PipelineEvent.COMPONENT_VALIDATED,
+            pipeline_id=pipeline_id,
+            component_id=42,
+        )
+        message = _message(envelope.model_dump(mode="json"))
+        broker = MagicMock()
+
+        with (
+            patch(
+                "app.services.pipeline_consumer.decode_envelope",
+                return_value=envelope,
+            ),
+            patch(
+                "app.services.pipeline_consumer.run_idempotent",
+                new_callable=AsyncMock,
+                return_value=(IdempotencyStatus.APPLIED, "Card"),
+            ),
+            patch(
+                "app.services.pipeline_consumer._increment_resolved_and_check_gate",
+                new_callable=AsyncMock,
+            ) as increment_gate,
+            patch(
+                "app.services.pipeline_consumer._ensure_verification_if_gate_open",
+                new_callable=AsyncMock,
+            ) as ensure_verification,
+            patch(
+                "app.services.pipeline_consumer._emit_project_event",
+            ) as emit_event,
+        ):
+            await _handle_component_outcome(
+                message,
+                broker,
+                expected_event=PipelineEvent.COMPONENT_VALIDATED,
+                sse_type="component_validated",
+            )
+
+        increment_gate.assert_not_awaited()
+        ensure_verification.assert_not_awaited()
+        emit_event.assert_called_once()
+        self.assertEqual(emit_event.call_args[0][1]["type"], "component_validated")
+        self.assertEqual(emit_event.call_args[0][1]["componentName"], "Card")
+        message.ack.assert_awaited_once()
+        message.nack.assert_not_awaited()
+
+    async def test_ad_hoc_duplicate_acks_without_verification_or_sse(self) -> None:
+        pipeline_id = uuid4()
+        envelope = _envelope(
+            event=PipelineEvent.COMPONENT_FAILED,
+            pipeline_id=pipeline_id,
+            component_id=7,
+        )
+        message = _message(envelope.model_dump(mode="json"))
+
+        with (
+            patch(
+                "app.services.pipeline_consumer.decode_envelope",
+                return_value=envelope,
+            ),
+            patch(
+                "app.services.pipeline_consumer.run_idempotent",
+                new_callable=AsyncMock,
+                return_value=(IdempotencyStatus.DUPLICATE, None),
+            ),
+            patch(
+                "app.services.pipeline_consumer._ensure_verification_if_gate_open",
+                new_callable=AsyncMock,
+            ) as ensure_verification,
+            patch(
+                "app.services.pipeline_consumer._emit_project_event",
+            ) as emit_event,
+        ):
+            await _handle_component_outcome(
+                message,
+                MagicMock(),
+                expected_event=PipelineEvent.COMPONENT_FAILED,
+                sse_type="component_failed",
+            )
+
+        ensure_verification.assert_not_awaited()
+        emit_event.assert_not_called()
+        message.ack.assert_awaited_once()
+
 
 class SchemaReadyHandlerTests(unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
@@ -299,6 +434,12 @@ class SchemaReadyHandlerTests(unittest.IsolatedAsyncioTestCase):
 
 
 class ShowcaseReadyHandlerTests(unittest.IsolatedAsyncioTestCase):
+    def setUp(self) -> None:
+        pipeline_state.pipeline_states.clear()
+
+    def tearDown(self) -> None:
+        pipeline_state.pipeline_states.clear()
+
     async def test_wrong_event_acks(self) -> None:
         envelope = _envelope(event=PipelineEvent.BRIEF_READY)
         message = _message(envelope.model_dump(mode="json"))
@@ -309,6 +450,31 @@ class ShowcaseReadyHandlerTests(unittest.IsolatedAsyncioTestCase):
         ):
             await _handle_showcase_ready(message, MagicMock())
 
+        message.ack.assert_awaited_once()
+
+    async def test_applied_marks_run_complete_and_keeps_state(self) -> None:
+        pipeline_id = uuid4()
+        state = PipelineState(project_id=1, pipeline_id=pipeline_id)
+        pipeline_state.pipeline_states[pipeline_id] = state
+        envelope = _envelope(event=PipelineEvent.SHOWCASE_READY, pipeline_id=pipeline_id)
+        message = _message(envelope.model_dump(mode="json"))
+
+        with (
+            patch(
+                "app.services.pipeline_consumer.decode_envelope",
+                return_value=envelope,
+            ),
+            patch(
+                "app.services.pipeline_consumer.run_idempotent",
+                new_callable=AsyncMock,
+                return_value=(IdempotencyStatus.APPLIED, None),
+            ),
+            patch("app.services.pipeline_consumer._emit_project_event"),
+        ):
+            await _handle_showcase_ready(message, MagicMock())
+
+        self.assertIs(pipeline_state.pipeline_states.get(pipeline_id), state)
+        self.assertTrue(state.run_complete)
         message.ack.assert_awaited_once()
 
 

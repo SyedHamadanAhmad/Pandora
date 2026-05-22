@@ -20,3 +20,4 @@ frontend/dist/
 .vscode/
 *.pdf
 /docs/
+/.cursor/*
