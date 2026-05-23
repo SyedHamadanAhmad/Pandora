@@ -10,13 +10,13 @@ from fastapi import FastAPI
 from app import rabbitmq
 from app.services import pipeline_consumer, pipeline_state
 from app.services.message_broker import MessageBroker
+from app.services.outbox_dispatcher import run_outbox_dispatcher
 
 logger = logging.getLogger(__name__)
 
 
-def consumer_status(app: FastAPI) -> str:
+def _task_status(task: asyncio.Task | None) -> str:
     """``running`` | ``failed`` | ``stopped`` | ``not_started`` for health checks."""
-    task = getattr(app.state, "pipeline_consumer_task", None)
     if task is None:
         return "not_started"
     if not task.done():
@@ -26,6 +26,14 @@ def consumer_status(app: FastAPI) -> str:
     if task.exception() is not None:
         return "failed"
     return "stopped"
+
+
+def consumer_status(app: FastAPI) -> str:
+    return _task_status(getattr(app.state, "pipeline_consumer_task", None))
+
+
+def outbox_dispatcher_status(app: FastAPI) -> str:
+    return _task_status(getattr(app.state, "outbox_dispatcher_task", None))
 
 
 async def start_pipeline_runtime(app: FastAPI) -> None:
@@ -47,24 +55,31 @@ async def start_pipeline_runtime(app: FastAPI) -> None:
     app.state.rabbitmq_connection = connection
     app.state.rabbitmq_publish_channel = publish_channel
     app.state.message_broker = broker
+    app.state.outbox_shutdown = asyncio.Event()
 
-    callback = pipeline_consumer.make_parses_complete_callback(broker)
+    callback = pipeline_consumer.make_parses_complete_callback()
 
     async def reconcile_brief(state: pipeline_state.PipelineState) -> None:
-        await pipeline_consumer.trigger_brief_work(state, broker)
+        await pipeline_consumer.trigger_brief_work(state)
 
     await pipeline_state.recover_running_projects(
         on_parses_complete=callback,
         reconcile_brief=reconcile_brief,
     )
-    pipeline_consumer.wire_parses_complete_callbacks(broker)
+    pipeline_consumer.wire_parses_complete_callbacks()
 
     consumer_task = asyncio.create_task(
         _run_consumer_supervised(connection, broker),
         name="pipeline-consumer",
     )
     app.state.pipeline_consumer_task = consumer_task
-    logger.info("pipeline consumer task started")
+
+    dispatcher_task = asyncio.create_task(
+        run_outbox_dispatcher(broker, shutdown_event=app.state.outbox_shutdown),
+        name="outbox-dispatcher",
+    )
+    app.state.outbox_dispatcher_task = dispatcher_task
+    logger.info("pipeline consumer and outbox dispatcher tasks started")
 
 
 async def _run_consumer_supervised(
@@ -82,14 +97,19 @@ async def _run_consumer_supervised(
 
 
 async def shutdown_pipeline_runtime(app: FastAPI) -> None:
-    """Cancel consumer, close RabbitMQ channels and connection."""
-    task = getattr(app.state, "pipeline_consumer_task", None)
-    if task is not None and not task.done():
-        task.cancel()
-        try:
-            await task
-        except asyncio.CancelledError:
-            pass
+    """Cancel consumer and outbox dispatcher, close RabbitMQ channels and connection."""
+    shutdown_event = getattr(app.state, "outbox_shutdown", None)
+    if shutdown_event is not None:
+        shutdown_event.set()
+
+    for attr in ("outbox_dispatcher_task", "pipeline_consumer_task"):
+        task = getattr(app.state, attr, None)
+        if task is not None and not task.done():
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
 
     publish_channel = getattr(app.state, "rabbitmq_publish_channel", None)
     if publish_channel is not None and not publish_channel.is_closed:

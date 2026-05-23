@@ -18,7 +18,6 @@ from app.services.pipeline_consumer import (
 )
 from app.services.pipeline_state import PipelineState
 from pandora_shared.events import MessageEnvelope, PipelineEvent
-from pandora_shared.queues import VERIFICATION_START
 
 
 def _message(body: dict) -> MagicMock:
@@ -69,7 +68,7 @@ class EnsureVerificationGateTests(unittest.IsolatedAsyncioTestCase):
                 new_callable=AsyncMock,
             ) as start_verification,
         ):
-            await _ensure_verification_if_gate_open(state, broker)
+            await _ensure_verification_if_gate_open(state)
 
         start_verification.assert_not_awaited()
 
@@ -94,9 +93,9 @@ class EnsureVerificationGateTests(unittest.IsolatedAsyncioTestCase):
                 new_callable=AsyncMock,
             ) as start_verification,
         ):
-            await _ensure_verification_if_gate_open(state, broker)
+            await _ensure_verification_if_gate_open(state)
 
-        start_verification.assert_awaited_once_with(state, broker)
+        start_verification.assert_awaited_once_with(state)
 
 
 class ParseResultsHandlerTests(unittest.IsolatedAsyncioTestCase):
@@ -512,26 +511,25 @@ class VerificationCompleteHandlerTests(unittest.IsolatedAsyncioTestCase):
 
 
 class StartVerificationTests(unittest.IsolatedAsyncioTestCase):
-    async def test_duplicate_claim_skips_publish(self) -> None:
+    async def test_duplicate_claim_skips_emit(self) -> None:
         pipeline_id = _PIPELINE_RUN_ID
         state = PipelineState(project_id=1, pipeline_id=pipeline_id)
-        broker = MagicMock()
-        broker.publish = AsyncMock()
 
-        with patch(
-            "app.services.pipeline_consumer.run_idempotent",
-            new_callable=AsyncMock,
-            return_value=(IdempotencyStatus.DUPLICATE, None),
+        with (
+            patch(
+                "app.services.pipeline_consumer.run_idempotent",
+                new_callable=AsyncMock,
+                return_value=(IdempotencyStatus.DUPLICATE, None),
+            ),
+            patch("app.services.pipeline_consumer._emit_project_event") as emit_event,
         ):
-            await _start_verification(state, broker)
+            await _start_verification(state)
 
-        broker.publish.assert_not_awaited()
+        emit_event.assert_not_called()
 
-    async def test_applied_publishes_verification_start(self) -> None:
+    async def test_applied_emits_verification_running(self) -> None:
         pipeline_id = _PIPELINE_RUN_ID
         state = PipelineState(project_id=1, pipeline_id=pipeline_id)
-        broker = MagicMock()
-        broker.publish = AsyncMock()
 
         with (
             patch(
@@ -539,13 +537,12 @@ class StartVerificationTests(unittest.IsolatedAsyncioTestCase):
                 new_callable=AsyncMock,
                 return_value=(IdempotencyStatus.APPLIED, None),
             ),
-            patch("app.services.pipeline_consumer._emit_project_event"),
+            patch("app.services.pipeline_consumer._emit_project_event") as emit_event,
         ):
-            await _start_verification(state, broker)
+            await _start_verification(state)
 
-        broker.publish.assert_awaited_once()
-        queue_name, envelope = broker.publish.await_args.args
-        self.assertEqual(queue_name, VERIFICATION_START)
+        emit_event.assert_called_once()
+        self.assertEqual(emit_event.call_args[0][1]["type"], "verification_running")
 
 
 if __name__ == "__main__":

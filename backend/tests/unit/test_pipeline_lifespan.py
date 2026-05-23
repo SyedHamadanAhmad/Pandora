@@ -38,12 +38,17 @@ class PipelineLifespanTests(unittest.IsolatedAsyncioTestCase):
                 "app.pipeline_runtime.pipeline_consumer.run_forever",
                 AsyncMock(side_effect=lambda *_: asyncio.sleep(3600)),
             ),
+            patch(
+                "app.pipeline_runtime.run_outbox_dispatcher",
+                AsyncMock(side_effect=lambda *_: asyncio.sleep(3600)),
+            ),
         ):
             await start_pipeline_runtime(app)
 
         self.assertIsNotNone(app.state.message_broker)
         self.assertIs(app.state.rabbitmq_publish_channel, mock_publish_channel)
         self.assertFalse(app.state.pipeline_consumer_task.done())
+        self.assertFalse(app.state.outbox_dispatcher_task.done())
         self.assertEqual(consumer_status(app), "running")
 
         await shutdown_pipeline_runtime(app)
@@ -74,6 +79,10 @@ class PipelineLifespanTests(unittest.IsolatedAsyncioTestCase):
             patch("app.pipeline_runtime.recover_running_projects", AsyncMock()),
             patch("app.pipeline_runtime.pipeline_consumer.wire_parses_complete_callbacks"),
             patch("app.pipeline_runtime.pipeline_consumer.run_forever", hang_forever),
+            patch(
+                "app.pipeline_runtime.run_outbox_dispatcher",
+                AsyncMock(side_effect=lambda *_: asyncio.sleep(3600)),
+            ),
         ):
             await start_pipeline_runtime(app)
             task = app.state.pipeline_consumer_task

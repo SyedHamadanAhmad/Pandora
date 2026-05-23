@@ -51,7 +51,6 @@ class StorybookSseEmitTests(unittest.IsolatedAsyncioTestCase):
                 project,
                 {"primary": "#ea580c"},
                 regenerate_components=True,
-                broker=MagicMock(),
             )
 
         event = emit_sse.call_args[0][1]

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
-from uuid import uuid4
 
 from fastapi import HTTPException
 
@@ -42,13 +41,11 @@ class _FakeProject:
 
 
 class ReviseComponentServiceTests(unittest.IsolatedAsyncioTestCase):
-    async def test_revise_publishes_and_emits_sse(self) -> None:
+    async def test_revise_enqueues_and_emits_sse(self) -> None:
         component = _FakeComponent()
         project = _FakeProject()
         session = AsyncMock()
         session.get = AsyncMock(return_value=component)
-        broker = MagicMock()
-        broker.publish = AsyncMock()
         pipeline_id = 42
 
         with (
@@ -66,6 +63,11 @@ class ReviseComponentServiceTests(unittest.IsolatedAsyncioTestCase):
                 new_callable=AsyncMock,
                 return_value=pipeline_id,
             ),
+            patch(
+                "app.services.storybook_revise.enqueue_outbox",
+                new_callable=AsyncMock,
+                return_value=True,
+            ) as enqueue_outbox,
             patch("app.services.storybook_revise.sse_service.emit") as emit_sse,
         ):
             result = await revise_component(
@@ -73,7 +75,6 @@ class ReviseComponentServiceTests(unittest.IsolatedAsyncioTestCase):
                 project,  # type: ignore[arg-type]
                 component.id,
                 "Use white text on primary button",
-                broker,
             )
 
         self.assertEqual(result.component_id, 1)
@@ -81,7 +82,7 @@ class ReviseComponentServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(component.status, ComponentStatus.generating)
         self.assertEqual(component.revision_instruction, "Use white text on primary button")
         self.assertEqual(component.revision_round, 1)
-        broker.publish.assert_awaited_once()
+        enqueue_outbox.assert_awaited_once()
         session.commit.assert_awaited_once()
         emit_sse.assert_called_once()
         from pandora_shared.sse_events import COMPONENT_REVISION_STARTED
@@ -103,7 +104,6 @@ class ReviseComponentServiceTests(unittest.IsolatedAsyncioTestCase):
                     _FakeProject(),  # type: ignore[arg-type]
                     1,
                     "fix contrast",
-                    MagicMock(),
                 )
         self.assertEqual(ctx.exception.status_code, 409)
 
@@ -118,7 +118,6 @@ class ReviseComponentServiceTests(unittest.IsolatedAsyncioTestCase):
                     _FakeProject(),  # type: ignore[arg-type]
                     1,
                     "   ",
-                    MagicMock(),
                 )
         self.assertEqual(ctx.exception.status_code, 400)
 

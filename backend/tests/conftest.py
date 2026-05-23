@@ -7,7 +7,7 @@ from uuid import uuid4
 
 import pytest
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import text
+from sqlalchemy import select
 
 from app.database import async_session
 from app.dependencies import get_message_broker
@@ -15,6 +15,7 @@ from app.main import app
 from app.models.component import Component
 from app.models.design_brief import DesignBrief
 from app.models.design_schema import DesignSchema
+from app.models.outbox_message import OutboxMessage, OutboxStatus
 from app.models.pipeline_run import PipelineRun
 from app.models.project import Project
 from app.models.thread_message import ThreadMessage

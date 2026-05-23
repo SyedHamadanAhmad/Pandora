@@ -8,6 +8,7 @@ from sqlalchemy import text
 from app.database import async_session, engine
 from app.pipeline_runtime import (
     consumer_status,
+    outbox_dispatcher_status,
     shutdown_pipeline_runtime,
     start_pipeline_runtime,
 )
@@ -56,6 +57,7 @@ async def health():
     except AttributeError:
         checks["rabbitmq"] = "not_initialized"
     checks["pipeline_consumer"] = consumer_status(app)
+    checks["outbox_dispatcher"] = outbox_dispatcher_status(app)
     try:
         async with async_session() as session:
             await session.execute(text("SELECT 1"))
@@ -67,6 +69,7 @@ async def health():
         if checks.get("rabbitmq") == "ok"
         and checks.get("postgres") == "ok"
         and checks.get("pipeline_consumer") == "running"
+        and checks.get("outbox_dispatcher") == "running"
         else "degraded"
     )
     return {"status": status, "checks": checks}

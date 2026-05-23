@@ -17,7 +17,9 @@ from app.database import async_session
 from app.models.component import Component
 from app.models.design_brief import DesignBrief
 from app.models.design_schema import DesignSchema
+from app.models.pipeline_run import PipelineRun
 from app.models.project import Project
+from app.services.outbox import enqueue_outbox
 from app.services import pipeline_state
 from app.services.idempotency import (
     IdempotencyStatus,
@@ -86,20 +88,18 @@ async def _nack_retry(message: AbstractIncomingMessage) -> None:
     await message.nack(requeue=True)
 
 
-def make_parses_complete_callback(
-    broker: MessageBroker,
-) -> OnParsesComplete:
+def make_parses_complete_callback() -> OnParsesComplete:
     """Build callback for ``init_state_from_thread`` / recovered pipelines."""
 
     async def callback(state: PipelineState) -> None:
-        await trigger_brief_work(state, broker)
+        await trigger_brief_work(state)
 
     return callback
 
 
-def wire_parses_complete_callbacks(broker: MessageBroker) -> None:
+def wire_parses_complete_callbacks() -> None:
     """Attach brief trigger to recovered states that are still in parse phase."""
-    callback = make_parses_complete_callback(broker)
+    callback = make_parses_complete_callback()
     for state in pipeline_states.values():
         if state.parse_pending and state._on_parses_complete is None:
             state._on_parses_complete = callback
@@ -118,14 +118,10 @@ def merge_parse_results(state: PipelineState) -> dict[str, Any]:
     return merged
 
 
-async def trigger_brief_work(state: PipelineState, broker: MessageBroker) -> None:
-    """Publish one brief work message when all parses are collected (Slice A)."""
+async def trigger_brief_work(state: PipelineState) -> None:
+    """Enqueue brief work when all parses are collected (Slice A)."""
     if state.brief_requested:
         return
-
-    async with async_session() as db:
-        await mark_brief_requested(state, db)
-        await db.commit()
 
     envelope = MessageEnvelope(
         event=PipelineEvent.BRIEF_REQUEST,
@@ -133,12 +129,25 @@ async def trigger_brief_work(state: PipelineState, broker: MessageBroker) -> Non
         pipeline_id=state.pipeline_id,
         payload=merge_parse_results(state),
     )
-    await broker.publish(BRIEF_REQUEST, envelope)
-    logger.info(
-        "published brief work project_id=%s pipeline_run_id=%s",
-        state.project_id,
-        state.pipeline_id,
-    )
+    key = build_idempotency_key(state.pipeline_id, PipelineEvent.BRIEF_REQUEST)
+
+    async with async_session() as db:
+        await mark_brief_requested(state, db)
+        inserted = await enqueue_outbox(
+            db,
+            BRIEF_REQUEST,
+            envelope,
+            project_id=state.project_id,
+            idempotency_key=key,
+        )
+        await db.commit()
+
+    if inserted:
+        logger.info(
+            "enqueued brief work project_id=%s pipeline_run_id=%s",
+            state.project_id,
+            state.pipeline_id,
+        )
 
 
 async def _consume_queue(
@@ -224,7 +233,7 @@ async def _handle_brief_ready(
         key = idempotency_key_for_envelope(envelope)
 
         async with async_session() as db:
-            status, brief_payload = await run_idempotent(
+            status, _ = await run_idempotent(
                 db,
                 idempotency_key=key,
                 project_id=envelope.project_id,
@@ -235,13 +244,6 @@ async def _handle_brief_ready(
             await message.ack()
             return
 
-        schema_envelope = MessageEnvelope(
-            event=PipelineEvent.SCHEMA_REQUEST,
-            project_id=envelope.project_id,
-            pipeline_id=envelope.pipeline_id,
-            payload=brief_payload,
-        )
-        await broker.publish(SCHEMA_REQUEST, schema_envelope)
         _emit_project_event(
             envelope.project_id,
             {
@@ -276,7 +278,7 @@ async def _handle_schema_ready(
         key = idempotency_key_for_envelope(envelope)
 
         async with async_session() as db:
-            status, fanout = await run_idempotent(
+            status, component_count = await run_idempotent(
                 db,
                 idempotency_key=key,
                 project_id=envelope.project_id,
@@ -289,13 +291,10 @@ async def _handle_schema_ready(
 
         async with async_session() as db:
             state = await get_state(envelope.pipeline_id, session=db)
-            state.expected_components = len(fanout)
+            state.expected_components = component_count
             state.resolved_components = 0
             await persist_state(state, db)
             await db.commit()
-
-        for work in fanout:
-            await broker.publish(COMPONENT_GENERATE, work)
 
         _emit_project_event(
             envelope.project_id,
@@ -303,7 +302,7 @@ async def _handle_schema_ready(
                 "type": "schema_ready",
                 "projectId": envelope.project_id,
                 "pipelineId": str(envelope.pipeline_id),
-                "componentCount": len(fanout),
+                "componentCount": component_count,
             },
         )
         await message.ack()
@@ -394,7 +393,7 @@ async def _handle_component_outcome(
             return
 
         if status == IdempotencyStatus.DUPLICATE:
-            await _ensure_verification_if_gate_open(state, broker)
+            await _ensure_verification_if_gate_open(state)
             await message.ack()
             return
 
@@ -410,7 +409,7 @@ async def _handle_component_outcome(
             },
         )
         if gate_open:
-            await _ensure_verification_if_gate_open(state, broker)
+            await _ensure_verification_if_gate_open(state)
         await message.ack()
     except ValidationError:
         logger.warning("invalid component outcome message; dropping")
@@ -455,7 +454,7 @@ async def _handle_verification_complete(
 
             state.revision_round += 1
             async with async_session() as db:
-                await _fanout_revision_generates(db, envelope, state, broker)
+                await _fanout_revision_generates(db, envelope, state)
                 lock = _pipeline_locks.setdefault(state.pipeline_id, asyncio.Lock())
                 async with lock:
                     state.resolved_components = 0
@@ -529,47 +528,51 @@ async def _expected_component_count(
     return int(result or 0)
 
 
-async def _ensure_verification_if_gate_open(
-    state: PipelineState,
-    broker: MessageBroker,
-) -> None:
+async def _ensure_verification_if_gate_open(state: PipelineState) -> None:
     """Start verification when DB shows all components resolved (survives redelivery/restart)."""
     async with async_session() as db:
         resolved = await _resolved_component_count(db, state.project_id)
         expected = await _expected_component_count(db, state.project_id, state)
     if expected <= 0 or resolved < expected:
         return
-    await _start_verification(state, broker)
+    await _start_verification(state)
 
 
-async def _start_verification(state: PipelineState, broker: MessageBroker) -> None:
-    """Slice E — publish verification work once all components are resolved."""
+async def _start_verification(state: PipelineState) -> None:
+    """Slice E — enqueue verification work once all components are resolved."""
     key = build_idempotency_key(
         state.pipeline_id,
         VERIFICATION_START_EVENT,
         attempt=Attempt(revision_round=state.revision_round),
     )
-    work_payload: dict[str, Any] = {}
+
+    async def _enqueue(session: AsyncSession) -> None:
+        work_payload = await _build_verification_work_payload(session, state.project_id)
+        envelope = MessageEnvelope(
+            event=VERIFICATION_START_EVENT,
+            project_id=state.project_id,
+            pipeline_id=state.pipeline_id,
+            payload=work_payload,
+        )
+        await enqueue_outbox(
+            session,
+            VERIFICATION_START,
+            envelope,
+            project_id=state.project_id,
+            idempotency_key=key,
+        )
+
     async with async_session() as db:
         status, _ = await run_idempotent(
             db,
             idempotency_key=key,
             project_id=state.project_id,
-            handler=_noop_handler,
+            handler=_enqueue,
         )
-        if status != IdempotencyStatus.DUPLICATE:
-            work_payload = await _build_verification_work_payload(db, state.project_id)
 
     if status == IdempotencyStatus.DUPLICATE:
         return
 
-    envelope = MessageEnvelope(
-        event=VERIFICATION_START_EVENT,
-        project_id=state.project_id,
-        pipeline_id=state.pipeline_id,
-        payload=work_payload,
-    )
-    await broker.publish(VERIFICATION_START, envelope)
     _emit_project_event(
         state.project_id,
         {
@@ -625,10 +628,6 @@ async def _increment_resolved_and_check_gate(state: PipelineState) -> bool:
     return gate_open
 
 
-async def _noop_handler(_session: AsyncSession) -> None:
-    return None
-
-
 async def _apply_pipeline_complete(
     session: AsyncSession,
     envelope: MessageEnvelope,
@@ -664,7 +663,7 @@ async def _finalize_pipeline_run(
 async def _apply_brief_ready(
     session: AsyncSession,
     envelope: MessageEnvelope,
-) -> dict[str, Any]:
+) -> None:
     payload = envelope.payload
     brief = DesignBrief(
         project_id=envelope.project_id,
@@ -678,13 +677,27 @@ async def _apply_brief_ready(
     )
     session.add(brief)
     await session.flush()
-    return dict(payload)
+
+    schema_envelope = MessageEnvelope(
+        event=PipelineEvent.SCHEMA_REQUEST,
+        project_id=envelope.project_id,
+        pipeline_id=envelope.pipeline_id,
+        payload=dict(payload),
+    )
+    schema_key = build_idempotency_key(envelope.pipeline_id, PipelineEvent.SCHEMA_REQUEST)
+    await enqueue_outbox(
+        session,
+        SCHEMA_REQUEST,
+        schema_envelope,
+        project_id=envelope.project_id,
+        idempotency_key=schema_key,
+    )
 
 
 async def _apply_schema_ready(
     session: AsyncSession,
     envelope: MessageEnvelope,
-) -> list[MessageEnvelope]:
+) -> int:
     payload = envelope.payload
     brief = await session.scalar(
         select(DesignBrief).where(DesignBrief.project_id == envelope.project_id)
@@ -704,7 +717,7 @@ async def _apply_schema_ready(
     session.add(schema)
     await session.flush()
 
-    work_envelopes: list[MessageEnvelope] = []
+    component_count = 0
     for index, spec in enumerate(specs):
         name = spec.get("name") or f"component-{index}"
         component = Component(
@@ -716,23 +729,40 @@ async def _apply_schema_ready(
         )
         session.add(component)
         await session.flush()
-        work_envelopes.append(
-            MessageEnvelope(
-                event=COMPONENT_GENERATE_EVENT,
-                project_id=envelope.project_id,
-                pipeline_id=envelope.pipeline_id,
-                component_id=component.id,
-                attempt=Attempt(retry_count=0, revision_round=0),
-                payload={
-                    "spec": spec,
-                    "spec_index": index,
-                    "design_tokens": payload.get("design_tokens"),
-                    "global_config": payload.get("global_config"),
-                },
-            )
+        work = MessageEnvelope(
+            event=COMPONENT_GENERATE_EVENT,
+            project_id=envelope.project_id,
+            pipeline_id=envelope.pipeline_id,
+            component_id=component.id,
+            attempt=Attempt(retry_count=0, revision_round=0),
+            payload={
+                "spec": spec,
+                "spec_index": index,
+                "design_tokens": payload.get("design_tokens"),
+                "global_config": payload.get("global_config"),
+            },
         )
+        outbox_key = build_idempotency_key(
+            envelope.pipeline_id,
+            COMPONENT_GENERATE_EVENT,
+            component_id=component.id,
+            attempt=Attempt(retry_count=0, revision_round=0),
+        )
+        await enqueue_outbox(
+            session,
+            COMPONENT_GENERATE,
+            work,
+            project_id=envelope.project_id,
+            idempotency_key=outbox_key,
+        )
+        component_count += 1
+
+    run = await session.get(PipelineRun, envelope.pipeline_id)
+    if run is not None:
+        run.expected_components = component_count
+        run.resolved_components = 0
     await session.flush()
-    return work_envelopes
+    return component_count
 
 
 async def _apply_component_outcome(
@@ -881,7 +911,6 @@ async def _fanout_revision_generates(
     session: AsyncSession,
     envelope: MessageEnvelope,
     state: PipelineState,
-    broker: MessageBroker,
 ) -> None:
     """Re-queue component.generate for components marked revised."""
     schema = await _latest_schema_for_project(session, envelope.project_id)
@@ -918,7 +947,19 @@ async def _fanout_revision_generates(
             revision_round=revision_round,
             storybook_ad_hoc=False,
         )
-        await broker.publish(COMPONENT_GENERATE, work)
+        outbox_key = build_idempotency_key(
+            envelope.pipeline_id,
+            COMPONENT_GENERATE_EVENT,
+            component_id=component.id,
+            attempt=work.attempt,
+        )
+        await enqueue_outbox(
+            session,
+            COMPONENT_GENERATE,
+            work,
+            project_id=envelope.project_id,
+            idempotency_key=outbox_key,
+        )
 
     await session.flush()
 

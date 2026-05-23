@@ -6,7 +6,6 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.dependencies import get_message_broker
 from app.middleware.session_auth import get_current_user_id
 from app.schemas.storybook import (
     ApplyTokensRequest,
@@ -20,7 +19,6 @@ from app.schemas.storybook import (
     SuggestTokensResponse,
     TokenPatchResponse,
 )
-from app.services.message_broker import MessageBroker
 from app.services.project_access import get_project_for_user
 from app.services.storybook_service import build_component_detail, build_storybook_overview
 from app.services.storybook_revise import revise_component
@@ -95,7 +93,6 @@ async def apply_storybook_tokens(
     body: ApplyTokensRequest,
     user_id: int = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
-    broker: MessageBroker = Depends(get_message_broker),
 ) -> ApplyTokensResponse:
     project = await get_project_for_user(db, project_id, user_id)
     return await apply_design_tokens(
@@ -103,7 +100,6 @@ async def apply_storybook_tokens(
         project,
         body.design_tokens,
         regenerate_components=body.regenerate_components,
-        broker=broker,
     )
 
 
@@ -118,7 +114,6 @@ async def revise_storybook_component(
     body: ReviseComponentRequest,
     user_id: int = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
-    broker: MessageBroker = Depends(get_message_broker),
 ) -> ReviseComponentResponse:
     project = await get_project_for_user(db, project_id, user_id)
     return await revise_component(
@@ -126,5 +121,4 @@ async def revise_storybook_component(
         project,
         component_id,
         body.message,
-        broker,
     )

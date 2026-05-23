@@ -19,7 +19,6 @@ from app.schemas.storybook import (
 )
 from app.services import sse_service
 from app.services.design_data import components_for_project, latest_schema_for_project
-from app.services.message_broker import MessageBroker
 from app.services.storybook_publish import (
     TOKEN_REGEN_REVISION_INSTRUCTION,
     fanout_token_regeneration,
@@ -249,7 +248,6 @@ async def apply_design_tokens(
     patch: dict[str, Any],
     *,
     regenerate_components: bool,
-    broker: MessageBroker,
 ) -> ApplyTokensResponse:
     if regenerate_components:
         await assert_storybook_idle(session, project.id)
@@ -265,7 +263,6 @@ async def apply_design_tokens(
             session,
             project_id=project.id,
             schema=schema,
-            broker=broker,
             design_tokens=merged,
         )
         sse_service.emit(

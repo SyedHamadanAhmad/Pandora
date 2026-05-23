@@ -9,10 +9,11 @@ from app.models.component import Component
 from app.models.project import Project
 from app.schemas.storybook import ReviseComponentResponse
 from app.services import sse_service
-from app.services.message_broker import MessageBroker
+from app.services.outbox import enqueue_outbox
 from app.services.storybook_publish import (
     build_component_generate_envelope,
     resolve_latest_pipeline_run_id,
+    storybook_generate_idempotency_key,
 )
 from app.services.storybook_tokens import assert_storybook_idle, require_design_schema
 from pandora_shared.enums import ComponentStatus
@@ -27,7 +28,6 @@ async def revise_component(
     project: Project,
     component_id: int,
     message: str,
-    broker: MessageBroker,
 ) -> ReviseComponentResponse:
     await assert_storybook_idle(session, project.id)
 
@@ -78,7 +78,13 @@ async def revise_component(
         revision_instruction=component.revision_instruction,
         revision_round=component.revision_round,
     )
-    await broker.publish(COMPONENT_GENERATE, envelope)
+    await enqueue_outbox(
+        session,
+        COMPONENT_GENERATE,
+        envelope,
+        project_id=project.id,
+        idempotency_key=storybook_generate_idempotency_key(envelope),
+    )
     await session.commit()
 
     sse_service.emit(

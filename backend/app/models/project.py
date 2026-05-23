@@ -12,6 +12,7 @@ if TYPE_CHECKING:
     from app.models.component import Component
     from app.models.design_brief import DesignBrief
     from app.models.design_schema import DesignSchema
+    from app.models.outbox_message import OutboxMessage
     from app.models.pipeline_run import PipelineRun
     from app.models.processed_event import ProcessedEvent
     from app.models.thread_message import ThreadMessage
@@ -58,5 +59,8 @@ class Project(Base):
         back_populates="project", cascade="all, delete-orphan"
     )
     processed_events: Mapped[list["ProcessedEvent"]] = relationship(
+        back_populates="project", cascade="all, delete-orphan"
+    )
+    outbox_messages: Mapped[list["OutboxMessage"]] = relationship(
         back_populates="project", cascade="all, delete-orphan"
     )

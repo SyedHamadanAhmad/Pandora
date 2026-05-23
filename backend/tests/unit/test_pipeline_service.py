@@ -18,7 +18,7 @@ class PipelineServiceTests(unittest.IsolatedAsyncioTestCase):
     def tearDown(self) -> None:
         pipeline_state.pipeline_states.clear()
 
-    async def test_trigger_sets_running_and_publishes_parse_jobs(self) -> None:
+    async def test_trigger_sets_running_and_enqueues_parse_jobs(self) -> None:
         project = MagicMock()
         project.id = 1
         project.status = ProjectStatus.pending
@@ -31,13 +31,11 @@ class PipelineServiceTests(unittest.IsolatedAsyncioTestCase):
         message.pipeline_run_id = None
 
         db = AsyncMock()
-        broker = AsyncMock()
-        published: list[str] = []
+        enqueued: list[str] = []
 
-        async def capture_publish(queue_name: str, envelope) -> None:
-            published.append(queue_name)
-
-        broker.publish.side_effect = capture_publish
+        async def capture_enqueue(session, queue_name, envelope, **kwargs) -> bool:
+            enqueued.append(queue_name)
+            return True
 
         mock_state = pipeline_state.PipelineState(
             project_id=1,
@@ -59,15 +57,18 @@ class PipelineServiceTests(unittest.IsolatedAsyncioTestCase):
             patch(
                 "app.services.pipeline_service.pipeline_state.schedule_parse_timeouts",
             ),
+            patch(
+                "app.services.pipeline_service.enqueue_outbox",
+                side_effect=capture_enqueue,
+            ),
         ):
-            result = await trigger_pipeline_run(db, broker, project, message)
+            result = await trigger_pipeline_run(db, project, message)
 
         self.assertEqual(result.status, ProjectStatus.running)
         self.assertEqual(result.pipeline_id, _PIPELINE_RUN_ID)
         self.assertEqual(project.status, ProjectStatus.running)
         db.commit.assert_awaited()
-        broker.publish.assert_awaited_once()
-        self.assertEqual(published, [PARSE_TEXT])
+        self.assertEqual(enqueued, [PARSE_TEXT])
         self.assertIn(result.pipeline_id, pipeline_state.pipeline_states)
 
 

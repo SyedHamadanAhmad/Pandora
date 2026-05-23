@@ -9,7 +9,6 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.dependencies import get_message_broker
 from app.middleware.session_auth import get_current_user_id
 from app.models.thread_message import ThreadMessage
 from app.services.project_access import get_project_for_user
@@ -18,7 +17,6 @@ from app.schemas.thread import (
     ThreadListResponse,
     ThreadMessageResponse,
 )
-from app.services.message_broker import MessageBroker
 from app.services.pipeline_service import trigger_pipeline_run
 from app.services.storage_service import (
     StorageValidationError,
@@ -63,7 +61,6 @@ async def create_thread_message(
     images: list[UploadFile] = File(default=[]),
     user_id: int = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
-    broker: MessageBroker = Depends(get_message_broker),
 ) -> CreateThreadResponse:
     project = await get_project_for_user(db, project_id, user_id)
 
@@ -116,7 +113,7 @@ async def create_thread_message(
     await db.commit()
     await db.refresh(message)
 
-    trigger = await trigger_pipeline_run(db, broker, project, message)
+    trigger = await trigger_pipeline_run(db, project, message)
 
     return CreateThreadResponse(
         message_id=message.id,

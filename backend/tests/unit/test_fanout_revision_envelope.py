@@ -36,9 +36,6 @@ class FanoutRevisionEnvelopeTests(unittest.IsolatedAsyncioTestCase):
         result = MagicMock()
         result.scalars.return_value.all.return_value = [component]
         session.execute = AsyncMock(return_value=result)
-
-        broker = MagicMock()
-        broker.publish = AsyncMock()
         envelope = MessageEnvelope(
             event="pandora.verification.complete",
             project_id=10,
@@ -53,6 +50,11 @@ class FanoutRevisionEnvelopeTests(unittest.IsolatedAsyncioTestCase):
                 return_value=_Schema(),
             ),
             patch(
+                "app.services.pipeline_consumer.enqueue_outbox",
+                new_callable=AsyncMock,
+                return_value=True,
+            ) as enqueue_outbox,
+            patch(
                 "app.services.pipeline_consumer.build_component_generate_envelope",
             ) as build_envelope,
         ):
@@ -63,11 +65,11 @@ class FanoutRevisionEnvelopeTests(unittest.IsolatedAsyncioTestCase):
                 component_id=5,
                 payload={},
             )
-            await _fanout_revision_generates(session, envelope, state, broker)
+            await _fanout_revision_generates(session, envelope, state)
 
         build_envelope.assert_called_once()
         self.assertEqual(build_envelope.call_args.kwargs.get("storybook_ad_hoc"), False)
-        broker.publish.assert_awaited_once()
+        enqueue_outbox.assert_awaited_once()
 
 
 if __name__ == "__main__":

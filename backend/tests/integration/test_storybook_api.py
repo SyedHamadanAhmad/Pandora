@@ -191,7 +191,16 @@ async def test_component_revise(api_client: AsyncClient, mock_broker) -> None:
     assert event["projectId"] == project_id
     assert event["componentId"] == str(component_id)
 
-    mock_broker.publish.assert_awaited_once()
+    async with async_session() as db:
+        rows = list(
+            (
+                await db.scalars(
+                    select(OutboxMessage).where(OutboxMessage.project_id == project_id)
+                )
+            ).all()
+        )
+    assert len(rows) == 1
+    assert rows[0].status == OutboxStatus.pending
 
 
 @pytest.mark.asyncio

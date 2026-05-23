@@ -1,4 +1,4 @@
-"""Publish storybook component regeneration work to RabbitMQ."""
+"""Publish storybook component regeneration work via transactional outbox."""
 
 from __future__ import annotations
 
@@ -12,9 +12,9 @@ from app.models.component import Component
 from app.models.design_schema import DesignSchema
 from app.models.thread_message import ThreadMessage
 from app.services.design_data import spec_for_component
-from app.services.message_broker import MessageBroker
+from app.services.outbox import enqueue_outbox
 from pandora_shared.enums import ComponentStatus
-from pandora_shared.events import Attempt, MessageEnvelope
+from pandora_shared.events import Attempt, MessageEnvelope, build_idempotency_key
 from pandora_shared.queues import COMPONENT_GENERATE
 
 COMPONENT_GENERATE_EVENT = "pandora.component.generate"
@@ -77,15 +77,23 @@ def build_component_generate_envelope(
     )
 
 
+def storybook_generate_idempotency_key(envelope: MessageEnvelope) -> str:
+    return build_idempotency_key(
+        envelope.pipeline_id,
+        COMPONENT_GENERATE_EVENT,
+        component_id=envelope.component_id,
+        attempt=envelope.attempt,
+    )
+
+
 async def fanout_token_regeneration(
     session: AsyncSession,
     *,
     project_id: int,
     schema: DesignSchema,
-    broker: MessageBroker,
     design_tokens: dict[str, Any],
 ) -> int:
-    """Re-queue component.generate for all validated components (token apply)."""
+    """Enqueue component.generate for all validated components (token apply)."""
     pipeline_run_id = await resolve_latest_pipeline_run_id(session, project_id)
     result = await session.execute(
         select(Component)
@@ -114,7 +122,13 @@ async def fanout_token_regeneration(
             revision_instruction=TOKEN_REGEN_REVISION_INSTRUCTION,
             revision_round=component.revision_round,
         )
-        await broker.publish(COMPONENT_GENERATE, envelope)
+        await enqueue_outbox(
+            session,
+            COMPONENT_GENERATE,
+            envelope,
+            project_id=project_id,
+            idempotency_key=storybook_generate_idempotency_key(envelope),
+        )
 
     await session.flush()
     return len(components)
