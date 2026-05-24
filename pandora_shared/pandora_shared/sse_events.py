@@ -31,6 +31,7 @@ PIPELINE_SSE_EVENT_TYPES: frozenset[str] = frozenset(
         REVISION_RUNNING,
         COMPONENT_VALIDATED,
         COMPONENT_FAILED,
+        COMPONENTS_READY,
     }
 )
 

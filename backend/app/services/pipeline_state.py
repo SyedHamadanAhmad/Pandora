@@ -57,6 +57,9 @@ class PipelineState:
     revision_round: int = 0
     run_complete: bool = False
     brief_requested: bool = False
+    components_ready_at_revision: int = -1
+    storybook_batch_expected: int = 0
+    storybook_batch_resolved: int = 0
     _timeout_tasks: list[asyncio.Task[None]] = field(default_factory=list, repr=False, compare=False)
     _on_parses_complete: OnParsesComplete | None = field(default=None, repr=False, compare=False)
 
@@ -133,6 +136,9 @@ async def _load_into_cache(
     state = _state_from_run(run, on_parses_complete=callback)
     if existing is not None:
         state._timeout_tasks = existing._timeout_tasks
+        state.components_ready_at_revision = existing.components_ready_at_revision
+        state.storybook_batch_expected = existing.storybook_batch_expected
+        state.storybook_batch_resolved = existing.storybook_batch_resolved
     pipeline_states[pipeline_run_id] = state
     return state
 
@@ -149,6 +155,29 @@ async def get_state(
         return await _load_into_cache(session, pipeline_run_id)
     async with async_session() as db:
         return await _load_into_cache(db, pipeline_run_id)
+
+
+async def register_storybook_batch(
+    pipeline_run_id: PipelineRunId,
+    expected: int,
+) -> None:
+    """Track post-pipeline token regen / revise fan-out for ``components_ready`` SSE."""
+    if expected <= 0:
+        return
+    try:
+        async with async_session() as db:
+            state = await get_state(pipeline_run_id, session=db)
+            if not state.run_complete:
+                return
+            state.storybook_batch_expected = expected
+            state.storybook_batch_resolved = 0
+            await persist_state(state, db)
+            await db.commit()
+    except PipelineStateNotFoundError:
+        logger.warning(
+            "storybook batch register skipped; pipeline_run id=%s not found",
+            pipeline_run_id,
+        )
 
 
 async def persist_state(state: PipelineState, session: AsyncSession) -> None:

@@ -19,9 +19,11 @@ from app.schemas.storybook import (
 )
 from app.services import sse_service
 from app.services.design_data import components_for_project, latest_schema_for_project
+from app.services.pipeline_state import register_storybook_batch
 from app.services.storybook_publish import (
     TOKEN_REGEN_REVISION_INSTRUCTION,
     fanout_token_regeneration,
+    resolve_latest_pipeline_run_id,
 )
 from pandora_shared.design_color import enrich_semantic_color_tokens
 from pandora_shared.enums import ComponentStatus
@@ -258,7 +260,9 @@ async def apply_design_tokens(
     schema.design_tokens = merged
 
     queued = 0
+    pipeline_run_id: int | None = None
     if regenerate_components:
+        pipeline_run_id = await resolve_latest_pipeline_run_id(session, project.id)
         queued = await fanout_token_regeneration(
             session,
             project_id=project.id,
@@ -275,6 +279,9 @@ async def apply_design_tokens(
         )
 
     await session.commit()
+
+    if regenerate_components and queued > 0 and pipeline_run_id is not None:
+        await register_storybook_batch(pipeline_run_id, queued)
 
     status_label = "token_apply_running" if regenerate_components and queued > 0 else "applied"
     return ApplyTokensResponse(

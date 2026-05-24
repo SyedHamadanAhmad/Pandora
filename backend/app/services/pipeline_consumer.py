@@ -43,6 +43,7 @@ from app.services.pipeline_state import (
 from app.services import sse_service
 from pandora_shared.enums import ComponentStatus, ProjectStatus
 from pandora_shared.sse_events import (
+    COMPONENTS_READY,
     PIPELINE_COMPLETE,
     REVISION_RUNNING,
     VERIFICATION_RUNNING,
@@ -389,10 +390,19 @@ async def _handle_component_outcome(
                         "componentName": component_name,
                     },
                 )
+                if state is not None:
+                    batch_done = await _increment_storybook_batch_and_check(state)
+                    if batch_done:
+                        await _maybe_emit_components_ready(
+                            state,
+                            source="storybook_regen",
+                        )
+                        await _clear_storybook_batch(state)
             await message.ack()
             return
 
         if status == IdempotencyStatus.DUPLICATE:
+            await _maybe_emit_components_ready(state, source="pipeline")
             await _ensure_verification_if_gate_open(state)
             await message.ack()
             return
@@ -409,6 +419,7 @@ async def _handle_component_outcome(
             },
         )
         if gate_open:
+            await _maybe_emit_components_ready(state, source="pipeline")
             await _ensure_verification_if_gate_open(state)
         await message.ack()
     except ValidationError:
@@ -628,6 +639,88 @@ async def _increment_resolved_and_check_gate(state: PipelineState) -> bool:
     return gate_open
 
 
+async def _increment_storybook_batch_and_check(state: PipelineState) -> bool:
+    if state.storybook_batch_expected <= 0:
+        return False
+    lock = _pipeline_locks.setdefault(state.pipeline_id, asyncio.Lock())
+    async with lock:
+        state.storybook_batch_resolved += 1
+        return state.storybook_batch_resolved >= state.storybook_batch_expected
+
+
+async def _clear_storybook_batch(state: PipelineState) -> None:
+    state.storybook_batch_expected = 0
+    state.storybook_batch_resolved = 0
+    async with async_session() as db:
+        await persist_state(state, db)
+        await db.commit()
+
+
+async def _components_ready_gate_open(
+    session: AsyncSession,
+    state: PipelineState,
+) -> tuple[bool, int]:
+    resolved = await _resolved_component_count(session, state.project_id)
+    expected = await _expected_component_count(session, state.project_id, state)
+    return expected > 0 and resolved >= expected, expected
+
+
+async def _maybe_emit_components_ready(
+    state: PipelineState,
+    *,
+    source: str,
+    skip_revision_dedupe: bool = False,
+) -> None:
+    """Emit ``components_ready`` when the component library batch is terminal."""
+    if source == "storybook_regen":
+        if state.storybook_batch_expected <= 0:
+            return
+        _emit_components_ready_event(
+            state,
+            source=source,
+            component_count=state.storybook_batch_expected,
+        )
+        return
+
+    async with async_session() as db:
+        gate_open, expected = await _components_ready_gate_open(db, state)
+    if not gate_open:
+        return
+    if (
+        source == "pipeline"
+        and not skip_revision_dedupe
+        and state.components_ready_at_revision >= state.revision_round
+    ):
+        return
+
+    if source == "pipeline":
+        state.components_ready_at_revision = state.revision_round
+        async with async_session() as db:
+            await persist_state(state, db)
+            await db.commit()
+
+    _emit_components_ready_event(state, source=source, component_count=expected)
+
+
+def _emit_components_ready_event(
+    state: PipelineState,
+    *,
+    source: str,
+    component_count: int,
+) -> None:
+    _emit_project_event(
+        state.project_id,
+        {
+            "type": COMPONENTS_READY,
+            "projectId": state.project_id,
+            "pipelineId": str(state.pipeline_id),
+            "componentCount": component_count,
+            "revisionRound": state.revision_round,
+            "source": source,
+        },
+    )
+
+
 async def _apply_pipeline_complete(
     session: AsyncSession,
     envelope: MessageEnvelope,
@@ -650,6 +743,11 @@ async def _finalize_pipeline_run(
     async with async_session() as db:
         await persist_state(state, db)
         await db.commit()
+    await _maybe_emit_components_ready(
+        state,
+        source="pipeline_complete",
+        skip_revision_dedupe=True,
+    )
     _emit_project_event(
         project_id,
         {

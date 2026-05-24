@@ -10,6 +10,7 @@ from app.models.project import Project
 from app.schemas.storybook import ReviseComponentResponse
 from app.services import sse_service
 from app.services.outbox import enqueue_outbox
+from app.services.pipeline_state import register_storybook_batch
 from app.services.storybook_publish import (
     build_component_generate_envelope,
     resolve_latest_pipeline_run_id,
@@ -86,6 +87,8 @@ async def revise_component(
         idempotency_key=storybook_generate_idempotency_key(envelope),
     )
     await session.commit()
+
+    await register_storybook_batch(pipeline_run_id, 1)
 
     sse_service.emit(
         project.id,
