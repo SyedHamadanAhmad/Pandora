@@ -69,7 +69,7 @@ class StreamRouteTests(unittest.IsolatedAsyncioTestCase):
         ):
             async def emit_event() -> None:
                 await asyncio.sleep(0.1)
-                sse_service.emit(
+                sse_service.deliver_local(
                     project_id,
                     {
                         "type": "design_brief_ready",

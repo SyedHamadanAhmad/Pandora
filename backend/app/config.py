@@ -6,6 +6,7 @@ class Settings(BaseSettings):
 
     database_url: str = "postgresql+asyncpg://pandora:pandora@postgres:5432/pandora"
     rabbitmq_url: str = "amqp://pandora:pandora@rabbitmq:5672/"
+    redis_url: str = "redis://redis:6379/0"
     secret_key: str = "dev-secret"
     minio_endpoint: str = "http://minio:9000"
     minio_access_key: str = "pandora"

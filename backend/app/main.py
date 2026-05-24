@@ -12,6 +12,7 @@ from app.pipeline_runtime import (
     shutdown_pipeline_runtime,
     start_pipeline_runtime,
 )
+from app.redis_client import close_redis, connect_redis, ping_redis
 from app.routers import (
     auth_router,
     projects_router,
@@ -19,15 +20,24 @@ from app.routers import (
     stream_router,
     thread_router,
 )
+from app.sse_runtime import (
+    shutdown_sse_runtime,
+    sse_relay_status,
+    start_sse_runtime,
+)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    await connect_redis()
+    await start_sse_runtime(app)
     await start_pipeline_runtime(app)
     try:
         yield
     finally:
         await shutdown_pipeline_runtime(app)
+        await shutdown_sse_runtime(app)
+        await close_redis()
         await engine.dispose()
 
 
@@ -56,8 +66,10 @@ async def health():
         checks["rabbitmq"] = "ok" if conn and not conn.is_closed else "closed"
     except AttributeError:
         checks["rabbitmq"] = "not_initialized"
+    checks["redis"] = "ok" if await ping_redis() else "error"
     checks["pipeline_consumer"] = consumer_status(app)
     checks["outbox_dispatcher"] = outbox_dispatcher_status(app)
+    checks["sse_relay"] = sse_relay_status(app)
     try:
         async with async_session() as session:
             await session.execute(text("SELECT 1"))
@@ -68,8 +80,10 @@ async def health():
         "ok"
         if checks.get("rabbitmq") == "ok"
         and checks.get("postgres") == "ok"
+        and checks.get("redis") == "ok"
         and checks.get("pipeline_consumer") == "running"
         and checks.get("outbox_dispatcher") == "running"
+        and checks.get("sse_relay") == "running"
         else "degraded"
     )
     return {"status": status, "checks": checks}

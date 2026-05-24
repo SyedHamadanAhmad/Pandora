@@ -1,21 +1,40 @@
-"""In-process SSE fan-out for pipeline progress (Phase 3 Step 6)."""
+"""SSE fan-out: Redis Pub/Sub across replicas + local connection queues (W-B04)."""
 
 from __future__ import annotations
 
 import asyncio
 import json
+import logging
 from collections import defaultdict
 from typing import Any, AsyncIterator
 
+from app.redis_client import get_redis
+
+logger = logging.getLogger(__name__)
+
 HEARTBEAT_INTERVAL_SECONDS = 20
 _SUBSCRIBER_QUEUE_MAXSIZE = 50
+
+SSE_CHANNEL_PREFIX = "sse:project:"
+SSE_CHANNEL_PATTERN = f"{SSE_CHANNEL_PREFIX}*"
 
 _lock = asyncio.Lock()
 _subscribers: dict[int, set[asyncio.Queue[dict[str, Any]]]] = defaultdict(set)
 
 
-def emit(project_id: int, event: dict[str, Any]) -> None:
-    """Push a project-scoped event to connected SSE clients; drop if a client is slow."""
+def channel_for_project(project_id: int) -> str:
+    return f"{SSE_CHANNEL_PREFIX}{project_id}"
+
+
+def project_id_from_channel(channel: str) -> int:
+    prefix = SSE_CHANNEL_PREFIX
+    if not channel.startswith(prefix):
+        raise ValueError(f"not a project sse channel: {channel!r}")
+    return int(channel[len(prefix) :])
+
+
+def deliver_local(project_id: int, event: dict[str, Any]) -> None:
+    """Push an event to SSE clients connected to this API process only."""
     queues = _subscribers.get(project_id)
     if not queues:
         return
@@ -24,6 +43,33 @@ def emit(project_id: int, event: dict[str, Any]) -> None:
             queue.put_nowait(event)
         except asyncio.QueueFull:
             pass
+
+
+async def publish_to_redis(project_id: int, event: dict[str, Any]) -> None:
+    """Publish a project event to Redis for all API replicas."""
+    redis = get_redis()
+    if redis is None:
+        deliver_local(project_id, event)
+        return
+
+    payload = json.dumps(event, separators=(",", ":"))
+    await redis.publish(channel_for_project(project_id), payload)
+
+
+def emit(project_id: int, event: dict[str, Any]) -> None:
+    """
+    Publish a project-scoped event for all SSE subscribers (all API replicas).
+
+    Uses Redis PUBLISH; each replica's ``sse_relay`` calls ``deliver_local``.
+    If Redis is unavailable or no event loop is running, delivers locally only.
+    """
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        deliver_local(project_id, event)
+        return
+
+    loop.create_task(publish_to_redis(project_id, event))
 
 
 async def subscribe(project_id: int) -> AsyncIterator[dict[str, Any]]:

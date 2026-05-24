@@ -30,6 +30,16 @@ services:
     networks:
       - pandora-net
 
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - pandora-net
+
   minio:
     image: minio/minio
     command: server /data --console-address ":9001"
@@ -87,6 +97,8 @@ services:
       postgres:
         condition: service_healthy
       rabbitmq:
+        condition: service_healthy
+      redis:
         condition: service_healthy
       minio:
         condition: service_healthy
