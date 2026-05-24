@@ -41,7 +41,7 @@ class SseRelayDeliveryTests(unittest.IsolatedAsyncioTestCase):
                     delivered = True
                     return {
                         "type": "pmessage",
-                        "channel": "sse:project:42",
+                        "channel": "sse:{42}:pub",
                         "data": json.dumps({"type": "schema_ready", "projectId": 42}),
                     }
                 await asyncio.sleep(0.02)

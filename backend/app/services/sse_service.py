@@ -1,4 +1,4 @@
-"""SSE fan-out: Redis Pub/Sub across replicas + local connection queues (W-B04)."""
+"""SSE fan-out: Redis Streams (replay) + Pub/Sub (live) across replicas (W-B04)."""
 
 from __future__ import annotations
 
@@ -8,6 +8,7 @@ import logging
 from collections import defaultdict
 from typing import Any, AsyncIterator
 
+from app.config import settings
 from app.redis_client import get_redis
 
 logger = logging.getLogger(__name__)
@@ -15,22 +16,28 @@ logger = logging.getLogger(__name__)
 HEARTBEAT_INTERVAL_SECONDS = 20
 _SUBSCRIBER_QUEUE_MAXSIZE = 50
 
-SSE_CHANNEL_PREFIX = "sse:project:"
-SSE_CHANNEL_PATTERN = f"{SSE_CHANNEL_PREFIX}*"
+# Hash tag {project_id} keeps stream + pub channel in one slot (Cluster + MULTI/EXEC).
+_SSE_HASH_PREFIX = "sse:{"
+_SSE_PUB_SUFFIX = "}:pub"
+SSE_CHANNEL_PATTERN = "sse:*:pub"
 
 _lock = asyncio.Lock()
 _subscribers: dict[int, set[asyncio.Queue[dict[str, Any]]]] = defaultdict(set)
 
 
+def stream_key_for_project(project_id: int) -> str:
+    return f"{_SSE_HASH_PREFIX}{project_id}}}:stream"
+
+
 def channel_for_project(project_id: int) -> str:
-    return f"{SSE_CHANNEL_PREFIX}{project_id}"
+    return f"{_SSE_HASH_PREFIX}{project_id}}}{_SSE_PUB_SUFFIX}"
 
 
 def project_id_from_channel(channel: str) -> int:
-    prefix = SSE_CHANNEL_PREFIX
-    if not channel.startswith(prefix):
+    if not channel.startswith(_SSE_HASH_PREFIX) or not channel.endswith(_SSE_PUB_SUFFIX):
         raise ValueError(f"not a project sse channel: {channel!r}")
-    return int(channel[len(prefix) :])
+    inner = channel[len(_SSE_HASH_PREFIX) : -len(_SSE_PUB_SUFFIX)]
+    return int(inner)
 
 
 def deliver_local(project_id: int, event: dict[str, Any]) -> None:
@@ -45,23 +52,85 @@ def deliver_local(project_id: int, event: dict[str, Any]) -> None:
             pass
 
 
+async def replay_stream(
+    project_id: int,
+    *,
+    after_id: str | None,
+) -> AsyncIterator[dict[str, Any]]:
+    """
+    Yield events from the per-project Redis stream after ``after_id`` (exclusive).
+
+    Used on SSE reconnect when the browser sends ``Last-Event-ID``.
+    """
+    if not after_id:
+        return
+
+    redis = get_redis()
+    if redis is None:
+        return
+
+    stream = stream_key_for_project(project_id)
+    try:
+        entries = await redis.xrange(stream, min=f"({after_id}", max="+")
+    except Exception:
+        logger.exception("sse stream replay failed project_id=%s", project_id)
+        return
+
+    for entry_id, fields in entries:
+        raw = fields.get("payload") if isinstance(fields, dict) else None
+        if not isinstance(raw, str):
+            continue
+        try:
+            event = json.loads(raw)
+        except json.JSONDecodeError:
+            logger.warning("sse stream invalid payload project_id=%s id=%s", project_id, entry_id)
+            continue
+        if not isinstance(event, dict):
+            continue
+        yield {**event, "sseId": entry_id}
+
+
 async def publish_to_redis(project_id: int, event: dict[str, Any]) -> None:
-    """Publish a project event to Redis for all API replicas."""
+    """
+    Atomically append to the project stream and notify all API replicas (MULTI/EXEC).
+
+    Both commands carry the same JSON payload so stream replay and live Pub/Sub stay aligned.
+    Reconnect replay attaches ``sseId`` from the stream entry id; live Pub/Sub uses the same body.
+    """
     redis = get_redis()
     if redis is None:
         deliver_local(project_id, event)
         return
 
     payload = json.dumps(event, separators=(",", ":"))
-    await redis.publish(channel_for_project(project_id), payload)
+    stream = stream_key_for_project(project_id)
+    channel = channel_for_project(project_id)
+    maxlen = settings.sse_stream_maxlen
+
+    try:
+        async with redis.pipeline(transaction=True) as pipe:
+            pipe.xadd(
+                stream,
+                {"payload": payload},
+                maxlen=maxlen,
+                approximate=True,
+            )
+            pipe.publish(channel, payload)
+            await pipe.execute()
+    except Exception:
+        logger.exception(
+            "sse atomic publish failed project_id=%s; delivering locally only",
+            project_id,
+        )
+        deliver_local(project_id, event)
 
 
 def emit(project_id: int, event: dict[str, Any]) -> None:
     """
     Publish a project-scoped event for all SSE subscribers (all API replicas).
 
-    Uses Redis PUBLISH; each replica's ``sse_relay`` calls ``deliver_local``.
-    If Redis is unavailable or no event loop is running, delivers locally only.
+    Uses Redis Stream + Pub/Sub in one MULTI/EXEC batch; each replica's ``sse_relay``
+    forwards live messages via ``deliver_local``.
     """
     try:
         loop = asyncio.get_running_loop()
@@ -88,7 +157,10 @@ async def subscribe(project_id: int) -> AsyncIterator[dict[str, Any]]:
 
 
 def format_sse_message(event: dict[str, Any]) -> str:
+    sse_id = event.get("sseId")
     data = json.dumps(event, separators=(",", ":"))
+    if isinstance(sse_id, str) and sse_id:
+        return f"id: {sse_id}\nevent: message\ndata: {data}\n\n"
     return f"event: message\ndata: {data}\n\n"
 
 
@@ -96,8 +168,15 @@ def format_sse_ping() -> str:
     return ": ping\n\n"
 
 
-async def stream_chunks(project_id: int) -> AsyncIterator[str]:
-    """SSE wire format with heartbeat comments when idle."""
+async def stream_chunks(
+    project_id: int,
+    *,
+    last_event_id: str | None = None,
+) -> AsyncIterator[str]:
+    """Replay buffered stream events, then live SSE with heartbeat pings when idle."""
+    async for event in replay_stream(project_id, after_id=last_event_id):
+        yield format_sse_message(event)
+
     subscription = subscribe(project_id)
     while True:
         try:
