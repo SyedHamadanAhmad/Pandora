@@ -1,163 +1,163 @@
-import { FormEvent, useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { createProject, listProjects } from "../api/projects";
+import { FormEvent, useCallback, useState } from "react";
+import { createProject } from "../api/projects";
 import { createThreadMessage } from "../api/thread";
-import type { Project } from "../api/types";
-import { StatusBadge } from "../components/StatusBadge";
+import type { DesignBriefReadyEvent } from "../api/types";
+import { PIPELINE_PROGRESS } from "../api/types";
+import { DesignBrief } from "../features/pipeline/DesignBrief";
+import { useProjectStream } from "../hooks/useProjectStream";
 import "./ProjectsPage.css";
 
+type PipelinePhase = "form" | "exiting" | "analysing" | "brief";
+
+const EXIT_MS = 300;
+
 export function ProjectsPage() {
-  const navigate = useNavigate();
-  const [projects, setProjects] = useState<Project[]>([]);
   const [name, setName] = useState("");
   const [prompt, setPrompt] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [loadingList, setLoadingList] = useState(true);
+  const [phase, setPhase] = useState<PipelinePhase>("form");
+  const [locked, setLocked] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [streamProjectId, setStreamProjectId] = useState<number | null>(null);
+  const [progress, setProgress] = useState(0);
+  const [progressPulse, setProgressPulse] = useState(false);
+  const [brief, setBrief] = useState<DesignBriefReadyEvent | null>(null);
 
-  const load = async () => {
-    const res = await listProjects();
-    setProjects(res.projects);
-  };
-
-  useEffect(() => {
-    void load()
-      .catch(() => setError("Failed to load projects"))
-      .finally(() => setLoadingList(false));
+  const handleSse = useCallback((event: Record<string, unknown>) => {
+    if (event.type !== "design_brief_ready") return;
+    const payload = event as DesignBriefReadyEvent;
+    setBrief(payload);
+    setProgress(PIPELINE_PROGRESS.briefReady);
+    setProgressPulse(false);
+    setPhase("brief");
   }, []);
+
+  useProjectStream(streamProjectId, handleSse);
 
   const createAndRun = async (e: FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !prompt.trim()) return;
-    setLoading(true);
+    if (!name.trim() || !prompt.trim() || locked) return;
+
+    setLocked(true);
     setError(null);
+    setBrief(null);
+    setProgress(0);
+    setProgressPulse(true);
+    setPhase("exiting");
+
+    const showAnalysing = window.setTimeout(() => {
+      setPhase("analysing");
+    }, EXIT_MS);
+
     try {
       const project = await createProject(name.trim());
+      setStreamProjectId(project.id);
       await createThreadMessage(project.id, prompt.trim());
-      navigate(`/projects/${project.id}/run`);
     } catch (err) {
+      window.clearTimeout(showAnalysing);
+      setPhase("form");
+      setLocked(false);
+      setProgressPulse(false);
+      setProgress(0);
+      setStreamProjectId(null);
       setError(err instanceof Error ? err.message : "Failed to start pipeline");
-    } finally {
-      setLoading(false);
     }
   };
 
+  const inPipeline = phase !== "form";
+  const showForm = phase === "form" || phase === "exiting";
+  const showAnalysing = phase === "analysing";
+  const showBrief = phase === "brief" && brief != null;
+
   return (
-    <div className="projects-page">
-      <header className="page-intro">
-        <h1 className="page-title">Projects</h1>
-        <p className="page-lead">
-          Describe what you want to build. Pandora runs the pipeline and opens
-          your storybook when components are ready.
-        </p>
-      </header>
-
-      <section className="panel new-project-panel" aria-labelledby="new-project-heading">
-        <h2 id="new-project-heading" className="panel-title">
-          New project
-        </h2>
-        <p className="panel-desc">
-          Name your project and paste a design prompt to start parsing and
-          generation.
-        </p>
-
-        <form className="new-project-form" onSubmit={(e) => void createAndRun(e)}>
-          <div className="field">
-            <label className="field-label" htmlFor="project-name">
-              Project name
-            </label>
-            <input
-              id="project-name"
-              className="field-input"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Marketing site"
-              required
-              disabled={loading}
+    <div
+      className={`projects-page${inPipeline ? " projects-page--pipeline" : ""}`}
+    >
+      <section className="pipeline-stage" aria-live="polite">
+        {inPipeline ? (
+          <div className="pipeline-stage__track" aria-hidden>
+            <div
+              className={`pipeline-stage__fill${progressPulse ? " pipeline-stage__fill--pulse" : ""}`}
+              style={{ width: `${progress}%` }}
             />
           </div>
+        ) : null}
 
-          <div className="field">
-            <label className="field-label" htmlFor="design-prompt">
-              Design prompt
-            </label>
-            <textarea
-              id="design-prompt"
-              className="field-input field-textarea"
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              placeholder="Describe the UI, brand feel, and components you need…"
-              required
-              disabled={loading}
-            />
-          </div>
+        <div className="pipeline-stage__body">
+          {showForm ? (
+            <div
+              className={`pipeline-form panel${phase === "exiting" ? " pipeline-form--exit" : ""}`}
+            >
+              <h1 className="pipeline-form__title">New project</h1>
+              <p className="pipeline-form__desc">
+                Name your project and describe what you want to build.
+              </p>
 
-          {error && (
-            <p className="form-message form-message--error" role="alert">
-              {error}
-            </p>
-          )}
+              <form
+                className="pipeline-form__fields"
+                onSubmit={(e) => void createAndRun(e)}
+                noValidate
+              >
+                <div className="field">
+                  <label className="field-label" htmlFor="project-name">
+                    Project name
+                  </label>
+                  <input
+                    id="project-name"
+                    className="field-input"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="e.g. Marketing site"
+                    required
+                    disabled={locked}
+                  />
+                </div>
 
-          <button type="submit" className="btn btn-cta" disabled={loading}>
-            {loading ? "Starting pipeline…" : "Create & run pipeline"}
-          </button>
-        </form>
-      </section>
+                <div className="field">
+                  <label className="field-label" htmlFor="design-prompt">
+                    Design prompt
+                  </label>
+                  <textarea
+                    id="design-prompt"
+                    className="field-input field-textarea pipeline-form__prompt"
+                    value={prompt}
+                    onChange={(e) => setPrompt(e.target.value)}
+                    placeholder="Describe the UI, brand feel, and components you need…"
+                    required
+                    disabled={locked}
+                  />
+                </div>
 
-      <section className="section project-list-section" aria-labelledby="recent-heading">
-        <h2 id="recent-heading" className="section-title">
-          Recent projects
-        </h2>
-
-        {loadingList ? (
-          <p className="text-muted">Loading projects…</p>
-        ) : projects.length === 0 ? (
-          <p className="text-muted">
-            No projects yet. Create one above to start your first pipeline.
-          </p>
-        ) : (
-          <ul className="project-list">
-            {projects.map((p) => (
-              <li key={p.id} className="project-card">
-                <div className="project-card-main">
-                  <div className="project-card-title-row">
-                    <h3 className="project-card-name">{p.name}</h3>
-                    <StatusBadge status={p.status} />
+                {error ? (
+                  <div className="form-alert" role="alert">
+                    <span className="form-alert__icon" aria-hidden>
+                      ⚠
+                    </span>
+                    <p className="form-alert__text">{error}</p>
                   </div>
-                  <p className="project-card-meta">
-                    Updated {formatDate(p.updatedAt)}
-                  </p>
-                </div>
-                <div className="project-card-actions">
-                  <Link
-                    to={`/projects/${p.id}/run`}
-                    className="text-link text-link--strong"
-                  >
-                    Pipeline
-                  </Link>
-                  <Link
-                    to={`/projects/${p.id}/storybook`}
-                    className="text-link text-link--strong"
-                  >
-                    Storybook
-                  </Link>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
+                ) : null}
+
+                <button
+                  type="submit"
+                  className="btn btn-cta"
+                  disabled={locked}
+                >
+                  Create &amp; run pipeline
+                </button>
+              </form>
+            </div>
+          ) : null}
+
+          {showAnalysing ? (
+            <p className="pipeline-status">
+              <span className="pipeline-status__text">
+                Analysing your inputs…
+              </span>
+            </p>
+          ) : null}
+
+          {showBrief ? <DesignBrief data={brief} /> : null}
+        </div>
       </section>
     </div>
   );
-}
-
-function formatDate(iso: string): string {
-  try {
-    return new Intl.DateTimeFormat(undefined, {
-      dateStyle: "medium",
-      timeStyle: "short",
-    }).format(new Date(iso));
-  } catch {
-    return iso;
-  }
 }

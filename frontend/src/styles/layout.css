@@ -13,6 +13,10 @@
   padding: var(--space-xl) var(--space-lg) var(--space-2xl);
 }
 
+.app-main:has(.projects-page--pipeline) {
+  max-width: none;
+}
+
 .page-intro {
   margin-bottom: var(--space-xl);
 }

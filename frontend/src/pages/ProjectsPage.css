@@ -1,105 +1,215 @@
-.projects-page {
-  width: 100%;
+/* Full-bleed pipeline workspace (form → analyse → brief) */
+.projects-page--pipeline {
+  margin: calc(-1 * var(--space-xl)) calc(-1 * var(--space-lg))
+    calc(-1 * var(--space-2xl));
+  width: calc(100% + 2 * var(--space-lg));
+  max-width: none;
 }
 
-.new-project-panel {
+@media (min-width: 900px) {
+  .projects-page--pipeline {
+    margin-left: calc(-1 * var(--space-lg));
+    margin-right: calc(-1 * var(--space-lg));
+    width: calc(100% + 2 * var(--space-lg));
+  }
+}
+
+.pipeline-stage {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100vh - var(--app-header-height) - var(--space-xl) * 2);
+  background: var(--color-bg);
+}
+
+.projects-page--pipeline .pipeline-stage {
+  min-height: calc(100vh - var(--app-header-height));
+}
+
+.pipeline-stage__track {
+  position: relative;
+  flex-shrink: 0;
+  height: 3px;
+  background: color-mix(in srgb, var(--color-brand-navy) 12%, var(--color-bg));
+}
+
+.pipeline-stage__fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: var(--color-brand-navy);
+  border-radius: 0 2px 2px 0;
+  transition: width 0.65s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.pipeline-stage__fill--pulse {
+  width: 4% !important;
+  transition: none;
+  animation: pipeline-progress-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes pipeline-progress-pulse {
+  0%,
+  100% {
+    opacity: 0.45;
+    transform: scaleX(0.85);
+    transform-origin: left;
+  }
+  50% {
+    opacity: 1;
+    transform: scaleX(1);
+    transform-origin: left;
+  }
+}
+
+.pipeline-stage__body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-2xl) var(--space-xl);
+}
+
+/* —— Full-screen form (phase 0) —— */
+.pipeline-form {
+  width: 100%;
+  max-width: 36rem;
   display: flex;
   flex-direction: column;
   gap: var(--space-lg);
+  animation: pipeline-form-in 0.35s ease both;
 }
 
-.panel-title {
+@keyframes pipeline-form-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.pipeline-form--exit {
+  animation: pipeline-form-out 300ms ease forwards;
+  pointer-events: none;
+}
+
+@keyframes pipeline-form-out {
+  to {
+    opacity: 0;
+    transform: translateY(-14px);
+  }
+}
+
+.pipeline-form__title {
+  margin: 0;
   font-family: var(--font-display);
-  font-size: var(--font-size-section);
-  font-weight: 600;
+  font-size: var(--font-size-page-title);
+  font-weight: 700;
+  letter-spacing: -0.02em;
   color: var(--color-text);
-  letter-spacing: -0.01em;
 }
 
-.panel-desc {
+.pipeline-form__desc {
   margin: calc(-1 * var(--space-sm)) 0 0;
   font-family: var(--font-body);
   font-size: var(--font-size-body);
   line-height: var(--line-height-body);
-  color: color-mix(in srgb, var(--color-text) 70%, var(--color-bg));
-  max-width: 32rem;
+  color: color-mix(in srgb, var(--color-text) 65%, var(--color-bg));
 }
 
-.new-project-form {
+.pipeline-form__fields {
   display: flex;
   flex-direction: column;
   gap: var(--space-lg);
   margin-top: var(--space-sm);
 }
 
-.project-list {
-  list-style: none;
+.pipeline-form__prompt {
+  min-height: 10rem;
+}
+
+.projects-page--pipeline .pipeline-form {
+  max-width: 42rem;
+  width: min(42rem, 100%);
+}
+
+/* Reuse login error alert styles */
+.projects-page .form-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  background: var(--color-error-bg);
+  border-left: 3px solid var(--color-error);
+  border-radius: 0 var(--radius-input) var(--radius-input) 0;
+}
+
+.projects-page .form-alert__icon {
+  flex-shrink: 0;
+  color: var(--color-error);
+}
+
+.projects-page .form-alert__text {
   margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-md);
-}
-
-.project-card {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-md) var(--space-lg);
-  padding: var(--space-lg) var(--space-xl);
-  background: var(--color-surface);
-  border: var(--border-width) solid var(--color-border);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-panel);
-  transition: border-color 0.15s ease;
-}
-
-.project-card:hover {
-  border-color: var(--color-cta);
-}
-
-.project-card-main {
-  flex: 1 1 12rem;
-  min-width: 0;
-}
-
-.project-card-title-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-sm) var(--space-md);
-}
-
-.project-card-name {
-  font-family: var(--font-display);
-  font-size: 1.125rem;
-  font-weight: 600;
-  color: var(--color-text);
-  margin: 0;
-  line-height: var(--line-height-tight);
-}
-
-.project-card-meta {
-  margin: var(--space-sm) 0 0;
-  font-family: var(--font-body);
   font-size: var(--font-size-label);
-  color: color-mix(in srgb, var(--color-text) 50%, var(--color-bg));
+  color: var(--color-error);
 }
 
-.project-card-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-lg);
+/* —— Analysing status (phase 1) —— */
+.pipeline-status {
+  margin: 0;
+  text-align: center;
+  animation: pipeline-status-in 0.35s ease both;
 }
 
-@media (min-width: 640px) {
-  .new-project-form {
-    max-width: 28rem;
+@keyframes pipeline-status-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
   }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
 
-  .project-card-actions {
-    flex-shrink: 0;
+.pipeline-status__text {
+  font-family: var(--font-body);
+  font-size: var(--font-size-subheading);
+  font-weight: 500;
+  color: var(--color-brand-navy);
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--color-brand-navy) 55%, var(--color-bg)) 0%,
+    var(--color-brand-navy) 45%,
+    color-mix(in srgb, var(--color-brand-navy) 55%, var(--color-bg)) 90%
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation:
+    pipeline-shimmer 2.8s linear infinite,
+    pipeline-breathe 2.4s ease-in-out infinite;
+}
+
+@keyframes pipeline-shimmer {
+  to {
+    background-position: 200% center;
+  }
+}
+
+@keyframes pipeline-breathe {
+  0%,
+  100% {
+    opacity: 0.72;
+  }
+  50% {
+    opacity: 1;
   }
 }
