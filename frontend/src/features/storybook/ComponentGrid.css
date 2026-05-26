@@ -1,0 +1,95 @@
+.component-grid__title {
+  margin: 0 0 var(--space-lg);
+  font-family: var(--font-display);
+  font-size: var(--font-size-section);
+  font-weight: 600;
+}
+
+.component-grid__empty {
+  margin: 0;
+}
+
+.component-grid__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+  gap: var(--space-md);
+}
+
+.component-grid__card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  height: 100%;
+  padding: var(--space-lg);
+  text-decoration: none;
+  color: inherit;
+  background: var(--color-surface);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-panel);
+  transition:
+    border-color 0.15s ease,
+    transform 0.15s ease;
+}
+
+.component-grid__card:hover {
+  border-color: var(--color-brand-navy);
+  transform: translateY(-2px);
+}
+
+.component-grid__card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+
+.component-grid__name {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 600;
+  line-height: var(--line-height-tight);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.component-grid__type {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: var(--font-size-caption);
+  text-transform: capitalize;
+  color: color-mix(in srgb, var(--color-text) 55%, var(--color-bg));
+}
+
+.component-grid__variants {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+}
+
+.component-grid__variant {
+  padding: 0.15rem 0.45rem;
+  font-family: var(--font-body);
+  font-size: var(--font-size-caption);
+  color: var(--color-brand-navy);
+  background: color-mix(in srgb, var(--color-brand-navy) 8%, var(--color-bg));
+  border-radius: 999px;
+}
+
+.component-grid__error {
+  margin: 0;
+  font-size: var(--font-size-caption);
+  color: var(--color-error);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

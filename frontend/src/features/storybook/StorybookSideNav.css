@@ -1,0 +1,98 @@
+.storybook-sidenav {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.storybook-sidenav__home {
+  flex-shrink: 0;
+  font-family: var(--font-display);
+  font-size: var(--font-size-body);
+  font-weight: 600;
+  color: var(--color-brand-navy);
+  text-decoration: none;
+  margin-bottom: var(--space-lg);
+}
+
+.storybook-sidenav__home:hover {
+  text-decoration: underline;
+}
+
+.storybook-sidenav__heading {
+  flex-shrink: 0;
+  margin: 0 0 var(--space-sm);
+  font-family: var(--font-display);
+  font-size: var(--font-size-caption);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--color-text) 50%, var(--color-bg));
+}
+
+.storybook-sidenav__hint {
+  margin: 0;
+  font-size: var(--font-size-caption);
+  color: color-mix(in srgb, var(--color-text) 50%, var(--color-bg));
+}
+
+.storybook-sidenav__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.storybook-sidenav__link {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm);
+  font-family: var(--font-body);
+  font-size: var(--font-size-label);
+  font-weight: 500;
+  color: var(--color-text);
+  text-decoration: none;
+  border-radius: var(--radius-sm);
+  transition: background 0.12s ease;
+}
+
+.storybook-sidenav__link:hover {
+  background: color-mix(in srgb, var(--color-brand-navy) 8%, var(--color-bg));
+}
+
+.storybook-sidenav__link--active {
+  background: color-mix(in srgb, var(--color-brand-navy) 12%, var(--color-bg));
+  color: var(--color-brand-navy);
+}
+
+.storybook-sidenav__icon {
+  flex-shrink: 0;
+  width: 1.1rem;
+  text-align: center;
+  font-size: 0.75rem;
+  line-height: 1;
+}
+
+.storybook-sidenav__icon--validated {
+  color: #059669;
+}
+
+.storybook-sidenav__icon--failed {
+  color: #d97706;
+}
+
+.storybook-sidenav__icon--generating,
+.storybook-sidenav__icon--validating {
+  color: var(--color-brand-navy);
+}
+
+.storybook-sidenav__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

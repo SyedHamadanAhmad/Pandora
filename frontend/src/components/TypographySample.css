@@ -1,0 +1,35 @@
+.typography-sample {
+  padding: var(--space-md);
+  background: var(--color-surface);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.typography-sample__meta {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-md);
+  margin-bottom: var(--space-sm);
+}
+
+.typography-sample__key {
+  font-family: var(--font-body);
+  font-size: var(--font-size-caption);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-brand-navy);
+}
+
+.typography-sample__value {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-caption);
+  color: color-mix(in srgb, var(--color-text) 55%, var(--color-bg));
+}
+
+.typography-sample__line {
+  margin: 0;
+  line-height: 1.45;
+  color: var(--color-text);
+}

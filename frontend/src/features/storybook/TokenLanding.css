@@ -1,0 +1,102 @@
+.token-landing__header {
+  margin-bottom: var(--space-xl);
+}
+
+.token-landing__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--font-size-page-title);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.token-landing__meta {
+  margin: var(--space-sm) 0 0;
+  font-family: var(--font-body);
+  font-size: var(--font-size-label);
+  color: color-mix(in srgb, var(--color-text) 60%, var(--color-bg));
+}
+
+.token-landing__section {
+  margin-bottom: var(--space-2xl);
+}
+
+.token-landing__section-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  margin-bottom: var(--space-md);
+}
+
+.token-landing__label {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--font-size-section);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.token-landing__swatches {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+  gap: var(--space-md);
+}
+
+.token-landing__pairs {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
+  gap: var(--space-md);
+}
+
+.semantic-pair {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.semantic-pair__sample {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 4rem;
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 600;
+  border-radius: var(--radius-md);
+  border: var(--border-width) solid var(--color-border);
+}
+
+.semantic-pair__meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.semantic-pair__bg {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-caption);
+  color: var(--color-text);
+}
+
+.semantic-pair__fg {
+  font-family: var(--font-body);
+  font-size: var(--font-size-caption);
+  color: color-mix(in srgb, var(--color-text) 55%, var(--color-bg));
+}
+
+.token-landing__typography {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}

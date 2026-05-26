@@ -1,0 +1,38 @@
+.component-status-icon {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  line-height: 1;
+  border-radius: var(--radius-sm);
+  border: var(--border-width) solid var(--color-border);
+}
+
+.component-status-icon--validated,
+.component-status-icon--revised {
+  color: #065f46;
+  background: #ecfdf5;
+  border-color: #6ee7b7;
+}
+
+.component-status-icon--failed {
+  color: #92400e;
+  background: #fffbeb;
+  border-color: #fcd34d;
+}
+
+.component-status-icon--generating,
+.component-status-icon--validating {
+  color: var(--color-brand-navy);
+  background: color-mix(in srgb, var(--color-brand-navy) 8%, var(--color-bg));
+  border-color: color-mix(in srgb, var(--color-brand-navy) 25%, var(--color-border));
+}
+
+.component-status-icon--pending {
+  color: color-mix(in srgb, var(--color-text) 50%, var(--color-bg));
+  background: var(--color-bg);
+}

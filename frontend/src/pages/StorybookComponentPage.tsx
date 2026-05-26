@@ -3,7 +3,8 @@ import { Link, useParams } from "react-router-dom";
 import { getComponentDetail } from "../api/storybook";
 import type { ComponentDetailResponse } from "../api/types";
 import { StatusBadge } from "../components/StatusBadge";
-import { useStorybookProjectSse } from "../hooks/useStorybookProjectSse";
+import { useStorybookOverview } from "../hooks/useStorybookOverview";
+import { useStorybookStore } from "../stores/storybookStore";
 import "./StorybookComponentPage.css";
 
 export function StorybookComponentPage() {
@@ -11,8 +12,9 @@ export function StorybookComponentPage() {
     useParams<{ projectId: string; componentId: string }>();
   const projectId = Number(projectIdParam);
   const componentId = Number(componentIdParam);
+  const overviewVersion = useStorybookStore((s) => s.overviewVersion);
 
-  useStorybookProjectSse(Number.isFinite(projectId) ? projectId : null);
+  useStorybookOverview(Number.isFinite(projectId) ? projectId : null);
 
   const [data, setData] = useState<ComponentDetailResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -38,7 +40,7 @@ export function StorybookComponentPage() {
     return () => {
       cancelled = true;
     };
-  }, [projectId, componentId]);
+  }, [projectId, componentId, overviewVersion]);
 
   if (!Number.isFinite(projectId) || !Number.isFinite(componentId)) {
     return <p className="text-muted">Invalid project or component.</p>;
@@ -46,11 +48,11 @@ export function StorybookComponentPage() {
 
   const overviewHref = `/projects/${projectId}/storybook`;
 
-  if (loading) {
+  if (loading && !data) {
     return <p className="storybook-component__status">Loading component…</p>;
   }
 
-  if (error) {
+  if (error && !data) {
     return (
       <div className="storybook-component panel">
         <p className="storybook-component__error" role="alert">
@@ -80,14 +82,14 @@ export function StorybookComponentPage() {
           <StatusBadge status={component.status} />
         </div>
         <p className="storybook-component__meta">
-          Sandpack preview and Props / Suggest tabs — Phase 3–4.
+          Sandpack preview and Props / Suggest — Phase 3.
         </p>
       </header>
 
       {component.tsxCode ? (
         <pre className="storybook-component__preview-snippet">
-          <code>{component.tsxCode.slice(0, 800)}</code>
-          {component.tsxCode.length > 800 ? "…" : ""}
+          <code>{component.tsxCode.slice(0, 1200)}</code>
+          {component.tsxCode.length > 1200 ? "…" : ""}
         </pre>
       ) : (
         <p className="text-muted">No preview code yet.</p>

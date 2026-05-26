@@ -13,7 +13,8 @@
   padding: var(--space-xl) var(--space-lg) var(--space-2xl);
 }
 
-.app-main:has(.projects-page--pipeline) {
+.app-main:has(.projects-page--pipeline),
+.app-main:has(.storybook-shell) {
   max-width: none;
 }
 
