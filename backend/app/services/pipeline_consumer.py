@@ -293,6 +293,10 @@ async def _handle_schema_ready(
             await persist_state(state, db)
             await db.commit()
 
+        schema_payload = envelope.payload if isinstance(envelope.payload, dict) else {}
+        component_names = _component_names_from_specs(
+            schema_payload.get("component_specs") or [],
+        )
         _emit_project_event(
             envelope.project_id,
             {
@@ -300,6 +304,7 @@ async def _handle_schema_ready(
                 "projectId": envelope.project_id,
                 "pipelineId": str(envelope.pipeline_id),
                 "componentCount": component_count,
+                "components": component_names,
             },
         )
         await message.ack()
@@ -378,13 +383,11 @@ async def _handle_component_outcome(
             if status != IdempotencyStatus.DUPLICATE:
                 _emit_project_event(
                     envelope.project_id,
-                    {
-                        "type": sse_type,
-                        "projectId": envelope.project_id,
-                        "pipelineId": str(envelope.pipeline_id),
-                        "componentId": str(envelope.component_id),
-                        "componentName": component_name,
-                    },
+                    _component_outcome_sse_payload(
+                        envelope,
+                        sse_type=sse_type,
+                        component_name=component_name,
+                    ),
                 )
                 if state is not None:
                     batch_done = await _increment_storybook_batch_and_check(state)
@@ -406,13 +409,11 @@ async def _handle_component_outcome(
         gate_open = await _increment_resolved_and_check_gate(state)
         _emit_project_event(
             envelope.project_id,
-            {
-                "type": sse_type,
-                "projectId": envelope.project_id,
-                "pipelineId": str(envelope.pipeline_id),
-                "componentId": str(envelope.component_id),
-                "componentName": component_name,
-            },
+            _component_outcome_sse_payload(
+                envelope,
+                sse_type=sse_type,
+                component_name=component_name,
+            ),
         )
         if gate_open:
             await _maybe_emit_components_ready(state, source="pipeline")
@@ -1056,6 +1057,35 @@ async def _fanout_revision_generates(
         )
 
     await session.flush()
+
+
+def _component_names_from_specs(specs: list[dict[str, Any]]) -> list[str]:
+    names: list[str] = []
+    for index, spec in enumerate(specs):
+        name = spec.get("name") if isinstance(spec, dict) else None
+        names.append(name if isinstance(name, str) and name.strip() else f"component-{index}")
+    return names
+
+
+def _component_outcome_sse_payload(
+    envelope: MessageEnvelope,
+    *,
+    sse_type: str,
+    component_name: str,
+) -> dict[str, Any]:
+    event: dict[str, Any] = {
+        "type": sse_type,
+        "projectId": envelope.project_id,
+        "pipelineId": str(envelope.pipeline_id),
+        "componentId": str(envelope.component_id),
+        "componentName": component_name,
+    }
+    if sse_type == "component_failed":
+        payload = envelope.payload if isinstance(envelope.payload, dict) else {}
+        err = payload.get("error_reason") or payload.get("error")
+        if err:
+            event["error"] = _truncate_text(str(err), limit=280)
+    return event
 
 
 def _design_brief_ready_sse_payload(envelope: MessageEnvelope) -> dict[str, Any]:

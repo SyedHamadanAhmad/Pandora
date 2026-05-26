@@ -1,0 +1,161 @@
+.component-build {
+  width: 100%;
+  max-width: 40rem;
+  margin: var(--space-xl) auto 0;
+  animation: pipeline-card-in 0.4s ease both;
+}
+
+.component-build__header {
+  margin-bottom: var(--space-md);
+}
+
+.component-build__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--font-size-section);
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.component-build__meta {
+  margin: var(--space-xs) 0 0;
+  font-family: var(--font-body);
+  font-size: var(--font-size-label);
+  color: color-mix(in srgb, var(--color-text) 55%, var(--color-bg));
+}
+
+.component-build__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* —— Row states —— */
+.component-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-sm);
+  border-left: 3px solid transparent;
+  transition:
+    background 0.2s ease,
+    border-color 0.25s ease;
+}
+
+.component-row__indicator {
+  flex-shrink: 0;
+  width: 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.component-row__name {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-body);
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: color 0.2s ease;
+}
+
+.component-row__error-hint {
+  flex-shrink: 1;
+  max-width: 40%;
+  font-family: var(--font-body);
+  font-size: var(--font-size-caption);
+  color: #b45309;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.component-row:hover .component-row__error-hint,
+.component-row:focus-within .component-row__error-hint {
+  opacity: 1;
+}
+
+/* Pending */
+.component-row--pending .component-row__name {
+  color: color-mix(in srgb, var(--color-text) 45%, var(--color-bg));
+}
+
+.component-row__dash {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-label);
+  color: color-mix(in srgb, var(--color-text) 35%, var(--color-bg));
+}
+
+/* Building */
+.component-row--building .component-row__name {
+  color: var(--color-text);
+}
+
+.component-row__arc {
+  display: block;
+  width: 0.85rem;
+  height: 0.85rem;
+  border: 2px solid color-mix(in srgb, var(--color-brand-navy) 25%, var(--color-bg));
+  border-top-color: var(--color-brand-navy);
+  border-radius: 50%;
+  animation: component-arc-spin 0.85s linear infinite;
+}
+
+@keyframes component-arc-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Validated */
+.component-row--validated {
+  border-left-color: #10b981;
+  background: color-mix(in srgb, #10b981 6%, var(--color-surface));
+}
+
+.component-row--validated .component-row__name {
+  color: var(--color-text);
+}
+
+.component-row__check {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #059669;
+  animation: component-status-pop 0.35s ease both;
+}
+
+/* Failed */
+.component-row--failed {
+  border-left-color: #f59e0b;
+  background: color-mix(in srgb, #f59e0b 8%, var(--color-surface));
+}
+
+.component-row--failed .component-row__name {
+  color: var(--color-text);
+}
+
+.component-row__warn {
+  font-size: 0.95rem;
+  color: #d97706;
+  animation: component-status-pop 0.35s ease both;
+}
+
+@keyframes component-status-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}

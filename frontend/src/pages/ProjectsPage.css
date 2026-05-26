@@ -72,6 +72,21 @@
   padding: var(--space-2xl) var(--space-xl);
 }
 
+.pipeline-stage__body--stack {
+  justify-content: flex-start;
+  align-items: stretch;
+  max-width: 40rem;
+  width: 100%;
+  margin: 0 auto;
+  padding-top: var(--space-xl);
+  padding-bottom: var(--space-2xl);
+}
+
+.pipeline-stage__body--stack .pipeline-status {
+  align-self: center;
+  margin: auto 0;
+}
+
 /* —— Full-screen form (phase 0) —— */
 .pipeline-form {
   width: 100%;

@@ -12,15 +12,19 @@ import {
   MAX_THREAD_IMAGES,
   MAX_THREAD_REF_URLS,
 } from "../api/thread";
-import type { DesignBriefReadyEvent } from "../api/types";
-import { PIPELINE_PROGRESS } from "../api/types";
 import { useToast } from "../components/Toast/ToastContext";
+import { ComponentBuildList } from "../features/pipeline/ComponentBuildList";
 import { DesignBrief } from "../features/pipeline/DesignBrief";
+import {
+  initialPipelineRunState,
+  reducePipelineSse,
+} from "../features/pipeline/pipelineRunState";
+import { SchemaPreparingCard } from "../features/pipeline/SchemaPreparingCard";
 import { useProjectStream } from "../hooks/useProjectStream";
 import { extractRefUrlsFromText } from "../utils/extractRefUrls";
 import "./ProjectsPage.css";
 
-type PipelinePhase = "form" | "exiting" | "analysing" | "brief";
+type PipelinePhase = "form" | "exiting" | "analysing";
 
 const EXIT_MS = 300;
 
@@ -39,21 +43,14 @@ export function ProjectsPage() {
   const [locked, setLocked] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [streamProjectId, setStreamProjectId] = useState<number | null>(null);
-  const [progress, setProgress] = useState(0);
-  const [progressPulse, setProgressPulse] = useState(false);
-  const [brief, setBrief] = useState<DesignBriefReadyEvent | null>(null);
+  const [run, setRun] = useState(initialPipelineRunState);
 
   const imageInputRef = useRef<HTMLInputElement>(null);
   const imageInputId = useId();
   const toast = useToast();
 
   const handleSse = useCallback((event: Record<string, unknown>) => {
-    if (event.type !== "design_brief_ready") return;
-    const payload = event as DesignBriefReadyEvent;
-    setBrief(payload);
-    setProgress(PIPELINE_PROGRESS.briefReady);
-    setProgressPulse(false);
-    setPhase("brief");
+    setRun((prev) => reducePipelineSse(prev, event));
   }, []);
 
   useProjectStream(streamProjectId, handleSse);
@@ -118,9 +115,7 @@ export function ProjectsPage() {
 
     setLocked(true);
     setError(null);
-    setBrief(null);
-    setProgress(0);
-    setProgressPulse(true);
+    setRun({ ...initialPipelineRunState(), progressPulse: true });
     setPhase("exiting");
 
     const showAnalysing = window.setTimeout(() => {
@@ -139,8 +134,7 @@ export function ProjectsPage() {
       window.clearTimeout(showAnalysing);
       setPhase("form");
       setLocked(false);
-      setProgressPulse(false);
-      setProgress(0);
+      setRun(initialPipelineRunState());
       setStreamProjectId(null);
       setError(err instanceof Error ? err.message : "Failed to start pipeline");
     }
@@ -148,8 +142,11 @@ export function ProjectsPage() {
 
   const inPipeline = phase !== "form";
   const showForm = phase === "form" || phase === "exiting";
-  const showAnalysing = phase === "analysing";
-  const showBrief = phase === "brief" && brief != null;
+  const showAnalysing = phase === "analysing" && run.brief == null;
+  const showBrief = run.brief != null;
+  const showSchemaPreparing = run.brief != null && run.schema == null;
+  const showComponentList =
+    run.schema != null && run.components.length > 0;
 
   return (
     <div
@@ -159,13 +156,13 @@ export function ProjectsPage() {
         {inPipeline ? (
           <div className="pipeline-stage__track" aria-hidden>
             <div
-              className={`pipeline-stage__fill${progressPulse ? " pipeline-stage__fill--pulse" : ""}`}
-              style={{ width: `${progress}%` }}
+              className={`pipeline-stage__fill${run.progressPulse ? " pipeline-stage__fill--pulse" : ""}`}
+              style={{ width: `${run.progress}%` }}
             />
           </div>
         ) : null}
 
-        <div className="pipeline-stage__body">
+        <div className="pipeline-stage__body pipeline-stage__body--stack">
           {showForm ? (
             <div
               className={`pipeline-form panel${phase === "exiting" ? " pipeline-form--exit" : ""}`}
@@ -324,7 +321,23 @@ export function ProjectsPage() {
             </p>
           ) : null}
 
-          {showBrief ? <DesignBrief data={brief} /> : null}
+          {showBrief && run.brief ? <DesignBrief data={run.brief} /> : null}
+
+          {showSchemaPreparing ? (
+            <SchemaPreparingCard
+              skeletonCount={Math.min(
+                run.brief.componentList.length || 4,
+                8,
+              )}
+            />
+          ) : null}
+
+          {showComponentList && run.schema ? (
+            <ComponentBuildList
+              rows={run.components}
+              componentCount={run.schema.componentCount}
+            />
+          ) : null}
         </div>
       </section>
     </div>
