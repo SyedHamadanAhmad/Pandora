@@ -1,5 +1,7 @@
 @import "./styles/fonts.css";
 @import "./styles/tokens.css";
+@import "./styles/forms.css";
+@import "./styles/buttons.css";
 
 * {
   box-sizing: border-box;
