@@ -14,7 +14,9 @@ from pandora_shared.sse_events import (  # noqa: E402
     ALL_SSE_EVENT_TYPES,
     COMPONENT_REVISION_STARTED,
     COMPONENT_VALIDATED,
+    DESIGN_BRIEF_READY,
     PIPELINE_COMPLETE,
+    SCHEMA_READY,
     STORYBOOK_SSE_EVENT_TYPES,
     TOKEN_REGENERATION_STARTED,
 )
@@ -31,6 +33,10 @@ class SseEventsTests(unittest.TestCase):
 
     def test_component_outcomes_in_pipeline_set(self) -> None:
         self.assertIn(COMPONENT_VALIDATED, ALL_SSE_EVENT_TYPES)
+
+    def test_early_pipeline_events_in_registry(self) -> None:
+        self.assertIn(DESIGN_BRIEF_READY, ALL_SSE_EVENT_TYPES)
+        self.assertIn(SCHEMA_READY, ALL_SSE_EVENT_TYPES)
 
 
 if __name__ == "__main__":

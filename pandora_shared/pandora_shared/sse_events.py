@@ -9,6 +9,8 @@ Note: completion is ``pipeline_complete`` (not ``project_completed``).
 from __future__ import annotations
 
 # Pipeline lifecycle
+DESIGN_BRIEF_READY = "design_brief_ready"
+SCHEMA_READY = "schema_ready"
 PIPELINE_COMPLETE = "pipeline_complete"
 VERIFICATION_RUNNING = "verification_running"
 REVISION_RUNNING = "revision_running"
@@ -26,6 +28,8 @@ COMPONENTS_READY = "components_ready"
 
 PIPELINE_SSE_EVENT_TYPES: frozenset[str] = frozenset(
     {
+        DESIGN_BRIEF_READY,
+        SCHEMA_READY,
         PIPELINE_COMPLETE,
         VERIFICATION_RUNNING,
         REVISION_RUNNING,

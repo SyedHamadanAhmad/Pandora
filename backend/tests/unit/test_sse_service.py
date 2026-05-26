@@ -139,6 +139,25 @@ class SseServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(events[0]["type"], "component_validated")
         self.assertEqual(events[0]["sseId"], "1700000001001-0")
 
+    async def test_replay_stream_replays_full_buffer_on_first_connect(self) -> None:
+        mock_redis = AsyncMock()
+        mock_redis.xrange = AsyncMock(
+            return_value=[
+                (
+                    "1700000001000-0",
+                    {"payload": '{"type":"design_brief_ready","projectId":7}'},
+                ),
+            ]
+        )
+
+        with patch("app.services.sse_service.get_redis", return_value=mock_redis):
+            events = [event async for event in sse_service.replay_stream(7, after_id=None)]
+
+        mock_redis.xrange.assert_awaited_once_with("sse:{7}:stream", min="-", max="+")
+        self.assertEqual(len(events), 1)
+        self.assertEqual(events[0]["type"], "design_brief_ready")
+        self.assertEqual(events[0]["sseId"], "1700000001000-0")
+
     async def test_stream_chunks_replays_before_live(self) -> None:
         replayed = {"type": "schema_ready", "projectId": 12, "sseId": "99-0"}
 
@@ -153,6 +172,21 @@ class SseServiceTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertIn("id: 99-0", first)
         self.assertIn("schema_ready", first)
+
+    async def test_stream_chunks_replays_on_first_connect(self) -> None:
+        replayed = {"type": "design_brief_ready", "projectId": 12, "sseId": "1-0"}
+
+        async def fake_replay(_project_id: int, *, after_id: str | None):
+            if after_id is None:
+                yield replayed
+
+        with patch("app.services.sse_service.replay_stream", fake_replay):
+            agen = sse_service.stream_chunks(12)
+            first = await asyncio.wait_for(agen.__anext__(), timeout=1.0)
+            await agen.aclose()
+
+        self.assertIn("id: 1-0", first)
+        self.assertIn("design_brief_ready", first)
 
     async def test_stream_chunks_yields_ping_on_idle(self) -> None:
         original = sse_service.HEARTBEAT_INTERVAL_SECONDS

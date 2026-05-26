@@ -247,11 +247,7 @@ async def _handle_brief_ready(
 
         _emit_project_event(
             envelope.project_id,
-            {
-                "type": "design_brief_ready",
-                "projectId": envelope.project_id,
-                "pipelineId": str(envelope.pipeline_id),
-            },
+            _design_brief_ready_sse_payload(envelope),
         )
         await message.ack()
     except PipelineStateNotFoundError:
@@ -1060,6 +1056,22 @@ async def _fanout_revision_generates(
         )
 
     await session.flush()
+
+
+def _design_brief_ready_sse_payload(envelope: MessageEnvelope) -> dict[str, Any]:
+    """SSE body for ``design_brief_ready`` (camelCase for API consumers)."""
+    payload = envelope.payload if isinstance(envelope.payload, dict) else {}
+    return {
+        "type": "design_brief_ready",
+        "projectId": envelope.project_id,
+        "pipelineId": str(envelope.pipeline_id),
+        "colorTokens": payload.get("color_tokens") or {},
+        "typographyScale": payload.get("typography_scale") or {},
+        "spacingSystem": payload.get("spacing_system") or {},
+        "tone": payload.get("tone"),
+        "componentList": payload.get("component_list") or [],
+        "inputGaps": payload.get("input_gaps") or [],
+    }
 
 
 def _emit_project_event(project_id: int, event: dict[str, Any]) -> None:

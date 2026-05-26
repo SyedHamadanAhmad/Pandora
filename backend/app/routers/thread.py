@@ -90,7 +90,6 @@ async def create_thread_message(
         role=MessageRole.user,
         content=content.strip() if has_content else None,
         input_urls=input_urls,
-        pipeline_id=None,
     )
     db.add(message)
     await db.flush()
@@ -109,9 +108,6 @@ async def create_thread_message(
 
     if image_urls:
         message.input_image_urls = image_urls
-
-    await db.commit()
-    await db.refresh(message)
 
     trigger = await trigger_pipeline_run(db, project, message)
 

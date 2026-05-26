@@ -59,4 +59,6 @@ class PipelineRun(Base):
     )
 
     project: Mapped["Project"] = relationship(back_populates="pipeline_runs")
-    thread_message: Mapped["ThreadMessage"] = relationship(back_populates="pipeline_run")
+    thread_message: Mapped["ThreadMessage"] = relationship(
+        foreign_keys=[thread_message_id],
+    )

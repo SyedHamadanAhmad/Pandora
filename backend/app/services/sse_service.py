@@ -26,17 +26,21 @@ _subscribers: dict[int, set[asyncio.Queue[dict[str, Any]]]] = defaultdict(set)
 
 
 def stream_key_for_project(project_id: int) -> str:
-    return f"{_SSE_HASH_PREFIX}{project_id}}}:stream"
+    return f"sse:{{{project_id}}}:stream"
 
 
 def channel_for_project(project_id: int) -> str:
-    return f"{_SSE_HASH_PREFIX}{project_id}}}{_SSE_PUB_SUFFIX}"
+    return f"sse:{{{project_id}}}:pub"
 
 
 def project_id_from_channel(channel: str) -> int:
-    if not channel.startswith(_SSE_HASH_PREFIX) or not channel.endswith(_SSE_PUB_SUFFIX):
+    prefix = "sse:"
+    suffix = ":pub"
+    if not channel.startswith(prefix) or not channel.endswith(suffix):
         raise ValueError(f"not a project sse channel: {channel!r}")
-    inner = channel[len(_SSE_HASH_PREFIX) : -len(_SSE_PUB_SUFFIX)]
+    inner = channel[len(prefix) : -len(suffix)]
+    if inner.startswith("{") and inner.endswith("}"):
+        inner = inner[1:-1]
     return int(inner)
 
 
@@ -58,20 +62,22 @@ async def replay_stream(
     after_id: str | None,
 ) -> AsyncIterator[dict[str, Any]]:
     """
-    Yield events from the per-project Redis stream after ``after_id`` (exclusive).
+    Yield events from the per-project Redis stream.
 
-    Used on SSE reconnect when the browser sends ``Last-Event-ID``.
+    When ``after_id`` is set (SSE reconnect), replay entries after that id.
+    On first connect (no ``Last-Event-ID``), replay the full buffered stream so
+    clients do not miss events emitted before subscribe.
     """
-    if not after_id:
-        return
-
     redis = get_redis()
     if redis is None:
         return
 
     stream = stream_key_for_project(project_id)
     try:
-        entries = await redis.xrange(stream, min=f"({after_id}", max="+")
+        if after_id:
+            entries = await redis.xrange(stream, min=f"({after_id}", max="+")
+        else:
+            entries = await redis.xrange(stream, min="-", max="+")
     except Exception:
         logger.exception("sse stream replay failed project_id=%s", project_id)
         return

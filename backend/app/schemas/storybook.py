@@ -4,10 +4,11 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import Field
+from pydantic import Field, field_validator
 
 from app.schemas.common import ApiModel, OrmResponseModel
 from app.schemas.component import ComponentResponse
+from app.services.variant_normalize import variants_for_api
 from pandora_shared.enums import ComponentStatus, ProjectStatus
 
 
@@ -39,6 +40,11 @@ class StorybookComponentSummary(ApiModel):
     tsx_preview: str | None = None
     css_preview: str | None = None
     error_reason: str | None = None
+
+    @field_validator("variants", mode="before")
+    @classmethod
+    def _normalize_variants(cls, value: Any) -> list[dict[str, Any]] | None:
+        return variants_for_api(value)
 
 
 class StorybookSummary(ApiModel):

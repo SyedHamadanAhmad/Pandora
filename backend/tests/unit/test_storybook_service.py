@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import unittest
 
-from app.schemas.storybook import StorybookSummary
+from app.schemas.storybook import StorybookComponentSummary, StorybookSummary
 from app.services.storybook_service import _summary_counts
 from app.services.storybook_tokens import design_tokens_for_api, enriched_design_tokens
 from pandora_shared.enums import ComponentStatus
@@ -25,6 +25,18 @@ class StorybookServiceTests(unittest.TestCase):
         api = design_tokens_for_api({"on_primary": "#ffffff", "text_muted": "#64748b"})
         self.assertEqual(api["onPrimary"], "#ffffff")
         self.assertEqual(api["textMuted"], "#64748b")
+
+    def test_component_summary_accepts_string_variants(self) -> None:
+        summary = StorybookComponentSummary(
+            id=1,
+            name="Button",
+            status=ComponentStatus.validated,
+            spec_index=0,
+            variants=["default", "primary"],
+            props={"label": "Click"},
+            preview_available=True,
+        )
+        self.assertEqual(summary.variants, [{"name": "default"}, {"name": "primary"}])
 
     def test_summary_counts(self) -> None:
         components = [

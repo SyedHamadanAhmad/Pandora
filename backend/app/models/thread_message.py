@@ -41,7 +41,9 @@ class ThreadMessage(Base):
 
     project: Mapped["Project"] = relationship(back_populates="thread_messages")
     user: Mapped["User"] = relationship(back_populates="thread_messages")
-    pipeline_run: Mapped["PipelineRun | None"] = relationship(back_populates="thread_message")
+    pipeline_run: Mapped["PipelineRun | None"] = relationship(
+        foreign_keys=[pipeline_run_id],
+    )
 
     @property
     def pipeline_id(self) -> int | None:

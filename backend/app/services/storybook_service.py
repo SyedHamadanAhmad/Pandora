@@ -25,6 +25,7 @@ from app.services.design_data import (
     truncate_text,
 )
 from app.services.storybook_tokens import design_tokens_for_api, enriched_design_tokens
+from app.services.variant_normalize import variants_for_api
 from pandora_shared.enums import ComponentStatus
 from pandora_shared.token_schema import storybook_token_schema
 
@@ -90,7 +91,7 @@ async def build_storybook_overview(
                 name=component.name,
                 status=component.status,
                 spec_index=component.spec_index,
-                variants=component.variants,
+                variants=variants_for_api(component.variants),
                 props=component.props,
                 preview_available=bool(tsx and tsx.strip()),
                 tsx_preview=truncate_text(tsx, limit=2000),
