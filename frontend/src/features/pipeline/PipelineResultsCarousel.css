@@ -1,0 +1,94 @@
+.pipeline-carousel {
+  display: grid;
+  grid-template-columns: 3rem 1fr 3rem;
+  align-items: start;
+  gap: var(--space-md);
+  width: 100%;
+  max-width: 56rem;
+  margin: 0 auto;
+}
+
+.pipeline-carousel__nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 3rem;
+  height: 3.5rem;
+  margin-top: var(--space-md);
+  padding: 0;
+  font-family: var(--font-body);
+  font-size: 2.25rem;
+  font-weight: 300;
+  line-height: 1;
+  color: color-mix(in srgb, var(--color-text) 38%, var(--color-bg));
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition:
+    color 0.15s ease,
+    opacity 0.15s ease;
+}
+
+.pipeline-carousel__nav:hover:not(:disabled) {
+  color: color-mix(in srgb, var(--color-text) 75%, var(--color-bg));
+}
+
+.pipeline-carousel__nav:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.pipeline-carousel__nav--hidden {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.pipeline-carousel__viewport {
+  min-width: 0;
+  width: 100%;
+}
+
+.pipeline-carousel__panel {
+  width: 100%;
+  animation: pipeline-slide-in 0.32s ease both;
+}
+
+.pipeline-carousel__panel--exit {
+  animation: pipeline-slide-out 0.28s ease forwards;
+}
+
+@keyframes pipeline-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pipeline-slide-out {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+
+/* Panel handles enter/exit; avoid stacked animations on children */
+.pipeline-carousel .design-brief {
+  max-width: none;
+  margin: 0;
+  animation: none;
+}
+
+.pipeline-carousel .component-build {
+  max-width: none;
+  margin: 0;
+  animation: none;
+}

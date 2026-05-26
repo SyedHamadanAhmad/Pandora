@@ -75,7 +75,7 @@
 .pipeline-stage__body--stack {
   justify-content: flex-start;
   align-items: stretch;
-  max-width: 40rem;
+  max-width: 56rem;
   width: 100%;
   margin: 0 auto;
   padding-top: var(--space-xl);

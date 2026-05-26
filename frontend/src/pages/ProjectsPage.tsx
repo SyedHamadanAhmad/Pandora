@@ -13,13 +13,11 @@ import {
   MAX_THREAD_REF_URLS,
 } from "../api/thread";
 import { useToast } from "../components/Toast/ToastContext";
-import { ComponentBuildList } from "../features/pipeline/ComponentBuildList";
-import { DesignBrief } from "../features/pipeline/DesignBrief";
 import {
   initialPipelineRunState,
   reducePipelineSse,
 } from "../features/pipeline/pipelineRunState";
-import { SchemaPreparingCard } from "../features/pipeline/SchemaPreparingCard";
+import { PipelineResultsCarousel } from "../features/pipeline/PipelineResultsCarousel";
 import { useProjectStream } from "../hooks/useProjectStream";
 import { extractRefUrlsFromText } from "../utils/extractRefUrls";
 import "./ProjectsPage.css";
@@ -143,10 +141,7 @@ export function ProjectsPage() {
   const inPipeline = phase !== "form";
   const showForm = phase === "form" || phase === "exiting";
   const showAnalysing = phase === "analysing" && run.brief == null;
-  const showBrief = run.brief != null;
-  const showSchemaPreparing = run.brief != null && run.schema == null;
-  const showComponentList =
-    run.schema != null && run.components.length > 0;
+  const showResultsCarousel = run.brief != null;
 
   return (
     <div
@@ -321,21 +316,11 @@ export function ProjectsPage() {
             </p>
           ) : null}
 
-          {showBrief && run.brief ? <DesignBrief data={run.brief} /> : null}
-
-          {showSchemaPreparing ? (
-            <SchemaPreparingCard
-              skeletonCount={Math.min(
-                run.brief.componentList.length || 4,
-                8,
-              )}
-            />
-          ) : null}
-
-          {showComponentList && run.schema ? (
-            <ComponentBuildList
-              rows={run.components}
-              componentCount={run.schema.componentCount}
+          {showResultsCarousel && run.brief ? (
+            <PipelineResultsCarousel
+              brief={run.brief}
+              schema={run.schema}
+              components={run.components}
             />
           ) : null}
         </div>

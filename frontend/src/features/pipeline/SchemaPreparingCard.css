@@ -1,7 +1,6 @@
 .schema-preparing {
   width: 100%;
-  max-width: 40rem;
-  margin: var(--space-xl) auto 0;
+  margin-top: var(--space-xl);
   animation: pipeline-card-in 0.4s ease both;
 }
 
