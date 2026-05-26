@@ -12,38 +12,49 @@ Transforms multi-modal input (text, images, URLs) into a production-ready React 
 ## First-time setup
 
 ```bash
-cp .env.example .env
-# Edit .env — set OPENROUTER_API_KEY before running workers (Phase 4+)
+make setup          # copies .env.example → .env
+# Edit .env — set OPENROUTER_API_KEY only if using real LLM workers
 
-make dev        # Start stack with hot reload (dev override)
-make migrate    # Run Alembic migrations (first run and after schema changes)
+make start-all      # API + infra + agent workers
+make health         # verify API is up
 ```
 
-Open:
+**Frontend (on host, optional):**
 
-- Frontend (dev): http://localhost:5173
-- Frontend (prod `make up`): http://localhost:3000
-- RabbitMQ management: http://localhost:15672 (credentials from `.env`)
-- MinIO console: http://localhost:9001 (credentials from `.env`)
-- PostgreSQL (dev, GUI clients): `postgresql://pandora:pandora@localhost:5432/pandora`
+```bash
+cd frontend && npm install && npm run dev
+# → http://localhost:5173 (proxies /api → :8000)
+```
+
+**API testing:** [docs/POSTMAN_PIPELINE_TEST.md](docs/POSTMAN_PIPELINE_TEST.md) — import `docs/postman/Pandora_API.postman_collection.json`
+
+### URLs
+
+| Service | URL |
+|---------|-----|
+| API | http://localhost:8000 |
+| OpenAPI | http://localhost:8000/docs |
+| Frontend (host) | http://localhost:5173 |
+| RabbitMQ UI | http://localhost:15672 |
+| MinIO console | http://localhost:9001 |
+| PostgreSQL | `postgresql://pandora:pandora@localhost:5432/pandora` |
 
 ## Makefile commands
 
+Run `make help` for the full list.
+
 | Command | Description |
 |---------|-------------|
-| `make dev` | Dev stack with volume mounts and hot reload |
-| `make up` | Production-style stack (built images, no volume mounts) |
-| `make down` | Stop all services |
-| `make migrate` | Run `alembic upgrade head` |
-| `make logs` | Tail all service logs |
-| `make shell s=backend` | Shell into a running container |
-| `make dev-phase7-e2e` | Full real agents (parse → verification, 5× gen + feedback) |
-| `make dev-phase6-e2e` | Phase 6 E2E (stub verify only) |
-| `make scale-component-gen n=5` | Scale component generation workers |
-| `make scale-feedback n=5` | Scale feedback validation workers |
-| `make dev-parse-agents` | Phase 4 parse workers (text, image, url) |
-| `make dev-parse-e2e` | Parse agents + stub downstream (brief/schema) |
-| `make test-parse-unit` | Unit tests for parse agents |
+| `make setup` | Create `.env` from example |
+| `make start` | API + Postgres + RabbitMQ + Redis + MinIO |
+| `make workers` | Agent workers (needs `OPENROUTER_API_KEY`) |
+| `make start-all` | `start` + `workers` |
+| `make down` | Stop all containers |
+| `make logs` | Follow backend logs |
+| `make migrate` | Run Alembic migrations |
+| `make test` | Integration tests in Docker |
+| `make health` | Check `/health` |
+| `make up` | Production-style stack (frontend on :3000) |
 
 ## Project layout
 

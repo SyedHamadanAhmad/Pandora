@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# Pandora dev helper — supports: ./scripts/dev start --watch
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$ROOT"
+
+cmd="${1:-help}"
+shift || true
+
+watch=0
+args=()
+for arg in "$@"; do
+  if [[ "$arg" == "--watch" || "$arg" == "-w" ]]; then
+    watch=1
+  else
+    args+=("$arg")
+  fi
+done
+
+export WATCH="$watch"
+
+case "$cmd" in
+  start|workers|start-all|down|logs|migrate|test|health|setup|help)
+    exec make "$cmd" "${args[@]}"
+    ;;
+  *)
+    echo "Unknown command: $cmd" >&2
+    echo "Usage: ./scripts/dev {start|workers|start-all|down|logs|...} [--watch]" >&2
+    exit 1
+    ;;
+esac

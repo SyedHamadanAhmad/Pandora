@@ -1,7 +1,5 @@
-# Real agents (Phases 4–7).
-# Phase 4 parse only: make dev-parse-agents
-# Phase 6 E2E: make dev-phase6-e2e (default --scale 5 for worker-component-gen + worker-feedback)
-# Entry modules live under workers/src/pandora_workers/run/
+# Agent workers (parse → brief → schema → components → verification).
+# Start with: make workers  (requires OPENROUTER_API_KEY in .env)
 
 x-agent-volumes: &agent-volumes
   - ./workers/src:/app/src
@@ -13,7 +11,6 @@ x-agent-restart: &agent-restart
 services:
   worker-parse-text:
     <<: *agent-restart
-    profiles: ["agents", "agents-parse"]
     build:
       context: .
       dockerfile: workers/Dockerfile.base
@@ -30,7 +27,6 @@ services:
 
   worker-parse-image:
     <<: *agent-restart
-    profiles: ["agents", "agents-parse"]
     build:
       context: .
       dockerfile: workers/Dockerfile.base
@@ -47,7 +43,6 @@ services:
 
   worker-parse-url:
     <<: *agent-restart
-    profiles: ["agents", "agents-parse"]
     build:
       context: .
       dockerfile: workers/Dockerfile.crawl
@@ -65,7 +60,6 @@ services:
 
   worker-brief:
     <<: *agent-restart
-    profiles: ["agents-downstream"]
     build:
       context: .
       dockerfile: workers/Dockerfile.base
@@ -81,7 +75,7 @@ services:
       - pandora-net
 
   worker-schema:
-    profiles: ["agents-downstream"]
+    <<: *agent-restart
     build:
       context: .
       dockerfile: workers/Dockerfile.base
@@ -98,7 +92,6 @@ services:
 
   worker-component-gen:
     <<: *agent-restart
-    profiles: ["agents-downstream"]
     build:
       context: .
       dockerfile: workers/Dockerfile.base
@@ -115,7 +108,6 @@ services:
 
   worker-feedback:
     <<: *agent-restart
-    profiles: ["agents-downstream"]
     build:
       context: .
       dockerfile: workers/Dockerfile.base
@@ -132,12 +124,12 @@ services:
 
   worker-verification:
     <<: *agent-restart
-    profiles: ["agents-downstream"]
     build:
       context: .
       dockerfile: workers/Dockerfile.base
     command: ["python", "-m", "pandora_workers.run.verification"]
     env_file: .env
+    volumes: *agent-volumes
     depends_on:
       rabbitmq:
         condition: service_healthy
