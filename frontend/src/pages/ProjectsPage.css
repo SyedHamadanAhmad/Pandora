@@ -1,0 +1,105 @@
+.projects-page {
+  width: 100%;
+}
+
+.new-project-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.panel-title {
+  font-family: var(--font-display);
+  font-size: var(--font-size-section);
+  font-weight: 600;
+  color: var(--color-text);
+  letter-spacing: -0.01em;
+}
+
+.panel-desc {
+  margin: calc(-1 * var(--space-sm)) 0 0;
+  font-family: var(--font-body);
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+  color: color-mix(in srgb, var(--color-text) 70%, var(--color-bg));
+  max-width: 32rem;
+}
+
+.new-project-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  margin-top: var(--space-sm);
+}
+
+.project-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.project-card {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md) var(--space-lg);
+  padding: var(--space-lg) var(--space-xl);
+  background: var(--color-surface);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-panel);
+  transition: border-color 0.15s ease;
+}
+
+.project-card:hover {
+  border-color: var(--color-cta);
+}
+
+.project-card-main {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+
+.project-card-title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm) var(--space-md);
+}
+
+.project-card-name {
+  font-family: var(--font-display);
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--color-text);
+  margin: 0;
+  line-height: var(--line-height-tight);
+}
+
+.project-card-meta {
+  margin: var(--space-sm) 0 0;
+  font-family: var(--font-body);
+  font-size: var(--font-size-label);
+  color: color-mix(in srgb, var(--color-text) 50%, var(--color-bg));
+}
+
+.project-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-lg);
+}
+
+@media (min-width: 640px) {
+  .new-project-form {
+    max-width: 28rem;
+  }
+
+  .project-card-actions {
+    flex-shrink: 0;
+  }
+}

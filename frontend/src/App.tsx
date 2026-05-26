@@ -1,8 +1,6 @@
+import { RouterProvider } from "react-router-dom";
+import { router } from "./routes/router";
+
 export default function App() {
-  return (
-    <main className="app">
-      <h1>Pandora</h1>
-      <p>Design system generator — POC scaffold</p>
-    </main>
-  );
+  return <RouterProvider router={router} />;
 }

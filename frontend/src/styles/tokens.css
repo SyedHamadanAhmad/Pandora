@@ -1,9 +1,15 @@
 :root {
   /* Surfaces */
   --color-bg: #f2ebe2;
+  --color-surface: #ffffff;
 
   /* Brand / actions */
   --color-cta: #001540;
+  --color-brand-navy: #1a1a2e;
+
+  /* Feedback */
+  --color-error: #dc2626;
+  --color-error-bg: #fff0f0;
 
   /* Neutrals */
   --color-border: #000000;
@@ -14,11 +20,18 @@
   /* Typography — loaded from Fontshare (see fonts.css) */
   --font-display: "Ranade", system-ui, sans-serif;
   --font-body: "Work Sans", system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, monospace;
 
   --font-size-display: 2.5rem;
+  --font-size-page-title: 2rem;
+  --font-size-section: 1.25rem;
   --font-size-subheading: 1.125rem;
   --font-size-body: 1rem;
   --font-size-label: 0.875rem;
+  --font-size-caption: 0.75rem;
+
+  --layout-max-width: 40rem;
+  --layout-wide-max-width: 52rem;
 
   --line-height-tight: 1.15;
   --line-height-body: 1.5;
@@ -33,5 +46,9 @@
 
   /* Controls */
   --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-input: 10px;
+  --radius-btn: 12px;
   --border-width: 1px;
+  --shadow-panel: 0 1px 0 rgba(0, 0, 0, 0.06);
 }

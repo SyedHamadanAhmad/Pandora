@@ -11,6 +11,11 @@
   color: var(--color-text);
 }
 
+.field-label--login {
+  font-weight: 500;
+  color: color-mix(in srgb, var(--color-text) 88%, var(--color-bg));
+}
+
 .field-input {
   width: 100%;
   padding: 0.65rem 0.75rem;
@@ -34,4 +39,44 @@
 .field-input:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+.field-input--login {
+  padding: 14px 16px;
+  background: #ffffff;
+  border: 1.5px solid color-mix(in srgb, var(--color-text) 25%, var(--color-bg));
+  border-radius: var(--radius-input);
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.field-input--login:focus {
+  outline: none;
+  border-color: var(--color-brand-navy);
+  box-shadow: 0 0 0 3px rgba(26, 26, 46, 0.1);
+}
+
+.field-input--login:disabled {
+  background: #ffffff;
+}
+
+.field-textarea {
+  min-height: 7rem;
+  resize: vertical;
+  line-height: var(--line-height-body);
+}
+
+.form-message {
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: var(--font-size-label);
+  color: var(--color-text);
+  border: var(--border-width) solid var(--color-border);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--color-surface);
+}
+
+.form-message--error {
+  border-color: var(--color-border);
 }
