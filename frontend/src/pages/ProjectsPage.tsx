@@ -13,12 +13,12 @@ import {
   MAX_THREAD_REF_URLS,
 } from "../api/thread";
 import { useToast } from "../components/Toast/ToastContext";
+import { PipelineResultsCarousel } from "../features/pipeline/PipelineResultsCarousel";
 import {
   initialPipelineRunState,
-  reducePipelineSse,
 } from "../features/pipeline/pipelineRunState";
-import { PipelineResultsCarousel } from "../features/pipeline/PipelineResultsCarousel";
-import { useProjectStream } from "../hooks/useProjectStream";
+import { usePipelineProjectSse } from "../hooks/usePipelineProjectSse";
+import { usePipelineStore } from "../stores/pipelineStore";
 import { extractRefUrlsFromText } from "../utils/extractRefUrls";
 import "./ProjectsPage.css";
 
@@ -46,12 +46,9 @@ export function ProjectsPage() {
   const imageInputRef = useRef<HTMLInputElement>(null);
   const imageInputId = useId();
   const toast = useToast();
+  const resetPipelineNav = usePipelineStore((s) => s.reset);
 
-  const handleSse = useCallback((event: Record<string, unknown>) => {
-    setRun((prev) => reducePipelineSse(prev, event));
-  }, []);
-
-  useProjectStream(streamProjectId, handleSse);
+  usePipelineProjectSse({ projectId: streamProjectId, setRun });
 
   const onPromptChange = (value: string) => {
     const { nextText, added, rejected } = extractRefUrlsFromText(
@@ -113,6 +110,7 @@ export function ProjectsPage() {
 
     setLocked(true);
     setError(null);
+    resetPipelineNav();
     setRun({ ...initialPipelineRunState(), progressPulse: true });
     setPhase("exiting");
 
@@ -132,6 +130,7 @@ export function ProjectsPage() {
       window.clearTimeout(showAnalysing);
       setPhase("form");
       setLocked(false);
+      resetPipelineNav();
       setRun(initialPipelineRunState());
       setStreamProjectId(null);
       setError(err instanceof Error ? err.message : "Failed to start pipeline");

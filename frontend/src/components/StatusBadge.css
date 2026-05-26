@@ -34,3 +34,22 @@
   color: var(--color-text-secondary);
   border-color: var(--color-text-secondary);
 }
+
+.status-badge--generating,
+.status-badge--validating {
+  background: var(--color-cta);
+  color: var(--color-text-inverse);
+  border-color: var(--color-cta);
+}
+
+.status-badge--validated {
+  background: #ecfdf5;
+  color: #065f46;
+  border-color: #6ee7b7;
+}
+
+.status-badge--revised {
+  background: color-mix(in srgb, var(--color-brand-navy) 10%, var(--color-bg));
+  color: var(--color-brand-navy);
+  border-color: var(--color-brand-navy);
+}

@@ -1,0 +1,52 @@
+.storybook-shell {
+  display: flex;
+  min-height: calc(100vh - var(--app-header-height) - var(--space-xl) * 2);
+  width: 100%;
+  max-width: 72rem;
+  margin: 0 auto;
+  gap: var(--space-lg);
+}
+
+.storybook-shell__nav {
+  flex: 0 0 30%;
+  max-width: 16rem;
+  padding: var(--space-md);
+  background: var(--color-surface);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.storybook-shell__nav-home {
+  font-family: var(--font-display);
+  font-size: var(--font-size-body);
+  font-weight: 600;
+  color: var(--color-brand-navy);
+  text-decoration: none;
+}
+
+.storybook-shell__nav-home:hover {
+  text-decoration: underline;
+}
+
+.storybook-shell__nav-hint {
+  margin: var(--space-sm) 0 0;
+  font-size: var(--font-size-caption);
+  color: color-mix(in srgb, var(--color-text) 55%, var(--color-bg));
+}
+
+.storybook-shell__main {
+  flex: 1;
+  min-width: 0;
+}
+
+@media (max-width: 768px) {
+  .storybook-shell {
+    flex-direction: column;
+  }
+
+  .storybook-shell__nav {
+    flex: none;
+    max-width: none;
+    width: 100%;
+  }
+}

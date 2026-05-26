@@ -76,7 +76,7 @@ export function AppShell() {
                 {projects.map((p) => (
                   <li key={p.id}>
                     <NavLink
-                      to={`/projects/${p.id}/run`}
+                      to={`/projects/${p.id}/storybook`}
                       className={({ isActive }) =>
                         `app-sidebar__link${isActive ? " app-sidebar__link--active" : ""}`
                       }

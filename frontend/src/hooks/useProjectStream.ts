@@ -22,6 +22,9 @@ export function useProjectStream(
     es.onmessage = (msg) => {
       try {
         const data = JSON.parse(msg.data) as Record<string, unknown>;
+        if (msg.lastEventId) {
+          data.sseId = msg.lastEventId;
+        }
         onEventRef.current(data);
       } catch {
         /* ignore malformed frames */
