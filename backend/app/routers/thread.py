@@ -25,6 +25,8 @@ from app.services.storage_service import (
 )
 from pandora_shared.enums import MessageRole
 
+MAX_REFERENCE_URLS = 3
+
 router = APIRouter(
     prefix="/api/projects/{project_id}/thread",
     tags=["thread"],
@@ -66,6 +68,12 @@ async def create_thread_message(
 
     input_urls = _parse_urls_field(urls)
     image_files = images or []
+
+    if input_urls is not None and len(input_urls) > MAX_REFERENCE_URLS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"At most {MAX_REFERENCE_URLS} reference URLs allowed",
+        )
 
     try:
         validate_image_count(image_files)

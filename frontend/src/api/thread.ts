@@ -1,9 +1,23 @@
+import type { CreateThreadMessageOptions } from "./threadLimits";
+
+export type { CreateThreadMessageOptions };
+export { MAX_THREAD_IMAGES, MAX_THREAD_REF_URLS } from "./threadLimits";
+
 export async function createThreadMessage(
   projectId: number,
-  content: string,
+  options: CreateThreadMessageOptions | string,
 ): Promise<{ messageId: number; pipelineId: number; status: string }> {
+  const opts: CreateThreadMessageOptions =
+    typeof options === "string" ? { content: options } : options;
+
   const body = new FormData();
-  body.append("content", content);
+  const content = opts.content?.trim() ?? "";
+  if (content) body.append("content", content);
+  const urls = opts.urls?.filter(Boolean) ?? [];
+  if (urls.length > 0) body.append("urls", JSON.stringify(urls));
+  for (const file of opts.images ?? []) {
+    body.append("images", file);
+  }
 
   const res = await fetch(`/api/projects/${projectId}/thread/`, {
     method: "POST",

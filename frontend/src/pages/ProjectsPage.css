@@ -133,6 +133,191 @@
   min-height: 10rem;
 }
 
+/* Design prompt + URL badges + images (single control surface) */
+.pipeline-prompt-shell {
+  display: flex;
+  flex-direction: column;
+  border: 1.5px solid color-mix(in srgb, var(--color-text) 22%, var(--color-bg));
+  border-radius: var(--radius-input);
+  background: #ffffff;
+  overflow: hidden;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.pipeline-prompt-shell:focus-within {
+  border-color: var(--color-brand-navy);
+  box-shadow: 0 0 0 3px rgba(26, 26, 46, 0.08);
+}
+
+.pipeline-prompt-shell .pipeline-form__prompt {
+  min-height: 10rem;
+  border: none;
+  border-radius: 0;
+  resize: vertical;
+}
+
+.pipeline-prompt-shell .pipeline-form__prompt:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+.pipeline-prompt-shell__footer {
+  border-top: 1px solid color-mix(in srgb, var(--color-text) 12%, var(--color-bg));
+  padding: var(--space-sm) var(--space-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  background: color-mix(in srgb, var(--color-bg) 40%, #ffffff);
+}
+
+.ref-url-badges {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+}
+
+.ref-url-badges__item {
+  display: inline-flex;
+  max-width: 100%;
+}
+
+.ref-url-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+  max-width: min(22rem, 100%);
+  padding: 0.2rem 0.35rem 0.2rem 0.55rem;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-caption);
+  font-weight: 500;
+  line-height: 1.35;
+  color: var(--color-text-inverse);
+  background: var(--color-cta);
+  border-radius: 999px;
+}
+
+.ref-url-badge__text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.ref-url-badge__remove {
+  flex-shrink: 0;
+  width: 1.25rem;
+  height: 1.25rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  line-height: 1;
+  color: #ffffff;
+  background: transparent;
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.ref-url-badge__remove:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.ref-url-badge__remove:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pipeline-prompt-shell__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+
+.ref-images-cta {
+  font-family: var(--font-body);
+  font-size: var(--font-size-label);
+  font-weight: 600;
+  color: var(--color-cta);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.ref-images-cta:hover:not(:disabled) {
+  color: var(--color-brand-navy);
+}
+
+.ref-images-cta:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  text-decoration: none;
+}
+
+.ref-attachments-meta {
+  font-family: var(--font-body);
+  font-size: var(--font-size-caption);
+  color: color-mix(in srgb, var(--color-text) 52%, var(--color-bg));
+}
+
+.ref-image-chips {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+}
+
+.ref-image-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  max-width: 100%;
+  padding: 0.15rem 0.45rem 0.15rem 0.55rem;
+  font-family: var(--font-body);
+  font-size: var(--font-size-caption);
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid color-mix(in srgb, var(--color-text) 15%, var(--color-bg));
+  border-radius: var(--radius-sm);
+}
+
+.ref-image-chip__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 12rem;
+}
+
+.ref-image-chip__remove {
+  flex-shrink: 0;
+  width: 1.25rem;
+  height: 1.25rem;
+  padding: 0;
+  font-size: 1rem;
+  line-height: 1;
+  color: var(--color-brand-navy);
+  background: transparent;
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.ref-image-chip__remove:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-brand-navy) 10%, var(--color-bg));
+}
+
 .projects-page--pipeline .pipeline-form {
   max-width: 42rem;
   width: min(42rem, 100%);

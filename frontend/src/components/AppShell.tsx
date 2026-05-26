@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { logout } from "../api/auth";
 import { listProjects } from "../api/projects";
@@ -30,6 +30,14 @@ export function AppShell() {
     };
   }, [location.pathname]);
 
+  const refetchProjects = useCallback(() => {
+    void listProjects()
+      .then((res) => setProjects(res.projects))
+      .catch(() => {
+        /* keep existing list on error */
+      });
+  }, []);
+
   const signOut = async () => {
     await logout();
     setAuthed(false);
@@ -51,7 +59,11 @@ export function AppShell() {
         </button>
       </header>
 
-      <div className="app-sidebar-rail" aria-label="Projects navigation">
+      <div
+        className="app-sidebar-rail"
+        aria-label="Projects navigation"
+        onMouseEnter={refetchProjects}
+      >
         <aside className="app-sidebar">
           <h2 className="app-sidebar__heading">Your projects</h2>
           {loadingProjects ? (

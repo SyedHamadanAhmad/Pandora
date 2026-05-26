@@ -16,6 +16,11 @@
   color: color-mix(in srgb, var(--color-text) 88%, var(--color-bg));
 }
 
+.field-required {
+  font-weight: 500;
+  color: color-mix(in srgb, var(--color-text) 50%, var(--color-bg));
+}
+
 .field-input {
   width: 100%;
   padding: 0.65rem 0.75rem;

@@ -89,6 +89,12 @@ class ThreadRouteTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(len(messages[0]["inputImageUrls"]), 1)
                 self.assertEqual(messages[0]["pipelineId"], body["pipelineId"])
 
-
-if __name__ == "__main__":
+                too_many_urls = await client.post(
+                    f"/api/projects/{project_id}/thread/",
+                    data={
+                        "content": "x",
+                        "urls": '["https://a.com","https://b.com","https://c.com","https://d.com"]',
+                    },
+                )
+                self.assertEqual(too_many_urls.status_code, 400)
     unittest.main()
