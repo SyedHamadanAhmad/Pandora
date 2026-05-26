@@ -1,3 +1,6 @@
+@import "./styles/fonts.css";
+@import "./styles/tokens.css";
+
 * {
   box-sizing: border-box;
   margin: 0;
@@ -5,24 +8,19 @@
 }
 
 body {
-  font-family: system-ui, -apple-system, sans-serif;
-  background: #0f0f12;
-  color: #e8e8ed;
+  font-family: var(--font-body);
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+  background: var(--color-bg);
+  color: var(--color-text);
   min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
 }
 
-.app {
-  max-width: 640px;
-  margin: 0 auto;
-  padding: 4rem 1.5rem;
-}
-
-.app h1 {
-  font-size: 2rem;
-  font-weight: 600;
-  margin-bottom: 0.5rem;
-}
-
-.app p {
-  color: #9898a6;
+h1,
+h2,
+h3,
+h4,
+button {
+  font-family: var(--font-display);
 }
