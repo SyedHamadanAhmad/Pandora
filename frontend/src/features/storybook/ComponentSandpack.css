@@ -1,0 +1,20 @@
+.component-sandpack {
+  min-height: 20rem;
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--color-surface);
+}
+
+.component-sandpack .sp-wrapper,
+.component-sandpack .sp-layout,
+.component-sandpack .sp-stack {
+  height: 100%;
+  min-height: 20rem;
+}
+
+.component-sandpack .sp-preview-container,
+.component-sandpack .sp-preview-iframe {
+  flex: 1;
+  min-height: 18rem;
+}

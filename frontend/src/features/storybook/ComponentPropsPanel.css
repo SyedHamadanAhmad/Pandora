@@ -1,0 +1,84 @@
+.component-props-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  min-height: 0;
+}
+
+.component-props-panel__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--font-size-section);
+  font-weight: 600;
+}
+
+.component-props-panel__hint {
+  margin: 0;
+  font-size: var(--font-size-caption);
+  color: color-mix(in srgb, var(--color-text) 55%, var(--color-bg));
+}
+
+.component-props-panel__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.component-props-panel__label {
+  font-size: var(--font-size-caption);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: color-mix(in srgb, var(--color-text) 65%, var(--color-bg));
+}
+
+.component-props-panel__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+.component-props-panel__row-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-xs);
+}
+
+.component-props-panel__key {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-caption);
+  font-weight: 600;
+  color: var(--color-brand-navy);
+}
+
+.component-props-panel__sample {
+  flex-shrink: 0;
+  font-size: var(--font-size-caption);
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+
+.component-props-panel__check {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: var(--font-size-label);
+}
+
+.component-props-panel__textarea {
+  width: 100%;
+  resize: vertical;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-caption);
+  line-height: 1.4;
+}
