@@ -114,6 +114,7 @@ class ComponentCodePayload(BaseModel):
     css_code: str | None = None
     props: dict[str, Any] | None = None
     variants: list[str] = Field(default_factory=list)
+    spec_type: str | None = None
 
 
 class ComponentGeneratedPayload(ComponentCodePayload):

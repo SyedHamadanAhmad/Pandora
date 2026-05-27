@@ -1,15 +1,19 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { getComponentDetail } from "../api/storybook";
-import type { ComponentDetailResponse } from "../api/types";
+import type { ComponentDetailResponse, ComponentStatus } from "../api/types";
+import { ComponentRetryButton } from "../components/ComponentRetryButton";
 import { ComponentPropsPanel } from "../features/storybook/ComponentPropsPanel";
+import { RefineComponentPanel } from "../features/storybook/RefineComponentPanel";
 import {
   computeMergedProps,
   listVariantNames,
 } from "../features/storybook/mergePreviewProps";
 import { StatusBadge } from "../components/StatusBadge";
+import { useReviseComponent } from "../hooks/useReviseComponent";
 import { useStorybookOverview } from "../hooks/useStorybookOverview";
 import { useStorybookStore } from "../stores/storybookStore";
+import { retryMessageFromError } from "../utils/refineMessage";
 import "./StorybookComponentPage.css";
 
 const ComponentSandpack = lazy(() =>
@@ -17,6 +21,10 @@ const ComponentSandpack = lazy(() =>
     default: m.ComponentSandpack,
   })),
 );
+
+function isComponentBusy(status: ComponentStatus): boolean {
+  return status === "generating" || status === "validating";
+}
 
 export function StorybookComponentPage() {
   const { projectId: projectIdParam, componentId: componentIdParam } =
@@ -26,6 +34,9 @@ export function StorybookComponentPage() {
   const overviewVersion = useStorybookStore((s) => s.overviewVersion);
 
   useStorybookOverview(Number.isFinite(projectId) ? projectId : null);
+  const { revise, isRevisePending } = useReviseComponent(
+    Number.isFinite(projectId) ? projectId : null,
+  );
 
   const [data, setData] = useState<ComponentDetailResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -78,6 +89,35 @@ export function StorybookComponentPage() {
     [data],
   );
 
+  const handleRefine = useCallback(
+    async (message: string) => {
+      if (!Number.isFinite(componentId)) return;
+      const ok = await revise(componentId, message);
+      if (ok && data) {
+        setData({
+          ...data,
+          component: { ...data.component, status: "generating" },
+        });
+      }
+    },
+    [componentId, revise, data],
+  );
+
+  const handleRetry = useCallback(() => {
+    if (!data) return;
+    void revise(
+      data.component.id,
+      retryMessageFromError(data.component.errorReason),
+    ).then((ok) => {
+      if (ok) {
+        setData({
+          ...data,
+          component: { ...data.component, status: "generating" },
+        });
+      }
+    });
+  }, [data, revise]);
+
   if (!Number.isFinite(projectId) || !Number.isFinite(componentId)) {
     return <p className="text-muted">Invalid project or component.</p>;
   }
@@ -107,6 +147,8 @@ export function StorybookComponentPage() {
 
   const { component, designTokens, spec } = data;
   const tsx = component.tsxCode?.trim();
+  const revisePending = isRevisePending(component.id);
+  const busy = revisePending || isComponentBusy(component.status);
   const canPreview =
     Boolean(tsx) &&
     (component.status === "validated" ||
@@ -123,8 +165,24 @@ export function StorybookComponentPage() {
         </Link>
         <div className="storybook-workspace__title-row">
           <h1 className="storybook-workspace__title">{component.name}</h1>
-          <StatusBadge status={component.status} />
+          <div className="storybook-workspace__title-actions">
+            {component.status === "failed" ? (
+              <ComponentRetryButton
+                onClick={handleRetry}
+                busy={revisePending}
+                disabled={busy && !revisePending}
+              />
+            ) : null}
+            <StatusBadge status={component.status} />
+          </div>
         </div>
+        {busy ? (
+          <p className="storybook-workspace__status-line" role="status">
+            {revisePending || component.status === "generating"
+              ? "Refining component — preview will update when ready…"
+              : "Validating component…"}
+          </p>
+        ) : null}
         {component.errorReason ? (
           <p className="storybook-workspace__error" role="status">
             {component.errorReason}
@@ -141,7 +199,7 @@ export function StorybookComponentPage() {
             <div className="storybook-workspace__placeholder panel">
               <p className="text-muted">No preview code yet.</p>
             </div>
-          ) : component.status === "generating" || component.status === "validating" ? (
+          ) : isComponentBusy(component.status) ? (
             <div className="storybook-workspace__placeholder panel">
               <p>Preview will be available when generation finishes.</p>
             </div>
@@ -171,6 +229,12 @@ export function StorybookComponentPage() {
               </pre>
             </div>
           )}
+
+          <RefineComponentPanel
+            disabled={busy}
+            busy={revisePending}
+            onSubmit={handleRefine}
+          />
         </section>
 
         <aside

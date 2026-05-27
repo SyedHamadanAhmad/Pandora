@@ -466,7 +466,14 @@ _FALLBACK_BY_TYPE: dict[str, Callable[..., dict[str, Any]]] = {
     "modal": _fallback_layout,
     "hero": _fallback_layout,
     "layout": _fallback_layout,
+    "generic": _fallback_layout,
 }
+
+
+def _attach_spec_type(payload: dict[str, Any], spec: dict[str, Any]) -> dict[str, Any]:
+    out = dict(payload)
+    out["spec_type"] = infer_spec_type(spec)
+    return out
 
 
 def _fallback_component(
@@ -478,11 +485,14 @@ def _fallback_component(
     name = _safe_component_name(spec.get("name"))
     typ = infer_spec_type(spec)
     factory = _FALLBACK_BY_TYPE.get(typ, _fallback_layout)
-    return factory(
-        name,
-        spec=spec,
-        design_tokens=design_tokens,
-        global_config=global_config,
+    return _attach_spec_type(
+        factory(
+            name,
+            spec=spec,
+            design_tokens=design_tokens,
+            global_config=global_config,
+        ),
+        spec,
     )
 
 
@@ -515,12 +525,15 @@ def _merge_llm_component(
     if props is not None and not isinstance(props, dict):
         props = None
 
-    return {
-        "tsx_code": tsx,
-        "css_code": css,
-        "props": props,
-        "variants": _normalize_variants(spec, llm),
-    }
+    return _attach_spec_type(
+        {
+            "tsx_code": tsx,
+            "css_code": css,
+            "props": props,
+            "variants": _normalize_variants(spec, llm),
+        },
+        spec,
+    )
 
 
 def _ensure_api_contract(

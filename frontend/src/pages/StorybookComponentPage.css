@@ -52,6 +52,19 @@
   gap: var(--space-md);
 }
 
+.storybook-workspace__title-actions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.storybook-workspace__status-line {
+  margin: var(--space-sm) 0 0;
+  font-size: var(--font-size-label);
+  color: var(--color-brand-navy);
+}
+
 .storybook-workspace__title {
   margin: 0;
   font-family: var(--font-display);
@@ -79,6 +92,7 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
+  gap: var(--space-lg);
 }
 
 .storybook-workspace__controls {

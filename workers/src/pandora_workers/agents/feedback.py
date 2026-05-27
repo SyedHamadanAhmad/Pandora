@@ -120,6 +120,7 @@ class FeedbackAgent(BaseAgent):
             ok, errors = await run_tsc_and_eslint(
                 generated.tsx_code,
                 generated.css_code,
+                spec_type=generated.spec_type,
             )
 
         _log_feedback(work, ok=ok, errors=errors, skipped=skipped)

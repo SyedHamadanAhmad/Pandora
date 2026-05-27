@@ -143,6 +143,11 @@ _KNOWN_TYPES = frozenset(
 )
 
 
+def _name_matches(name: str, pattern: str) -> bool:
+    """Case-insensitive regex match on component name (use word boundaries for short tokens)."""
+    return bool(re.search(pattern, name, re.IGNORECASE))
+
+
 def infer_spec_type(spec: dict[str, Any]) -> str:
     """Resolve semantic type from spec ``type`` or component ``name``."""
     raw = spec.get("type")
@@ -150,30 +155,36 @@ def infer_spec_type(spec: dict[str, Any]) -> str:
         candidate = raw.strip().lower()
         # Return any recognised type as-is; unknown types become generic.
         return candidate if candidate in _KNOWN_TYPES else "generic"
-    name = str(spec.get("name") or "").lower()
-    if "button" in name or "cta" in name:
+    name = str(spec.get("name") or "")
+    if _name_matches(name, r"\b(button|cta)\b"):
         return "button"
-    if "badge" in name or "chip" in name or "tag" in name:
+    if _name_matches(name, r"\b(badge|chip|tag)\b"):
         return "badge"
-    if "card" in name or "tile" in name:
+    if _name_matches(name, r"\b(card|tile)\b"):
         return "card"
-    if "nav" in name or "menu" in name or "tab" in name:
+    # Word-boundary match: ``tab`` inside ``DataTable`` must not imply navigation.
+    if (
+        _name_matches(name, r"\b(nav|menu|navigation)\b")
+        or re.search(r"nav", name, re.IGNORECASE)
+        or _name_matches(name, r"\btabs?\b|\btab[-_]")
+        or _name_matches(name, r"^Tab[A-Z]")
+    ):
         return "navigation"
-    if "input" in name or "field" in name or "search" in name:
+    if _name_matches(name, r"\b(input|search)\b") or _name_matches(name, r"\bfield\b"):
         return "input"
-    if "modal" in name or "dialog" in name:
+    if _name_matches(name, r"\b(modal|dialog)\b"):
         return "modal"
-    if "hero" in name or "banner" in name:
+    if _name_matches(name, r"\b(hero|banner)\b"):
         return "hero"
-    if "section" in name or "layout" in name or "page" in name or "container" in name:
+    if _name_matches(name, r"\b(section|layout|page|container)\b"):
         return "layout"
     # Everything else (Dropdown, Toggle, Accordion, DataTable, etc.) is generic.
     return "generic"
 
 
 def contract_for_type(spec_type: str) -> ComponentApiContract:
-    key = (spec_type or "layout").strip().lower()
-    return _CONTRACTS.get(key, _CONTRACTS["layout"])
+    key = (spec_type or "generic").strip().lower()
+    return _CONTRACTS.get(key, _CONTRACTS["generic"])
 
 
 def default_props_for_type(spec_type: str) -> dict[str, Any]:

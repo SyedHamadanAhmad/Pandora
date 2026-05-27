@@ -25,6 +25,27 @@ class ComponentApiContractTests(unittest.TestCase):
     def test_infer_badge(self) -> None:
         self.assertEqual(infer_spec_type({"name": "StatusBadge"}), "badge")
 
+    def test_infer_datatable_is_generic_not_navigation(self) -> None:
+        self.assertEqual(infer_spec_type({"name": "DataTable"}), "generic")
+        self.assertEqual(
+            infer_spec_type({"name": "DataTable", "type": "generic"}),
+            "generic",
+        )
+
+    def test_infer_tab_nav_components(self) -> None:
+        self.assertEqual(infer_spec_type({"name": "TabBar"}), "navigation")
+        self.assertEqual(infer_spec_type({"name": "MainNav"}), "navigation")
+
+    def test_generic_contract_has_no_required_props(self) -> None:
+        tsx = """
+        export type DataTableProps = { title: string; rows: string[] };
+        export function DataTable({ title, rows }: DataTableProps) {
+          return <table><caption>{title}</caption></table>;
+        }
+        """
+        errors = check_api_contract(tsx, "generic")
+        self.assertEqual(errors, [])
+
     def test_button_fallback_label_and_onclick(self) -> None:
         out = _fallback_button(
             "Button",

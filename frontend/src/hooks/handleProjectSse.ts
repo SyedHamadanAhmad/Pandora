@@ -84,6 +84,35 @@ export function handleProjectSse(
       break;
     }
 
+    case "component_revision_started": {
+      if (isOnStorybookRoute(ctx.pathname, ctx.projectId)) {
+        effects.bumpStorybookOverview = true;
+      }
+      break;
+    }
+
+    case "component_validated": {
+      if (isOnStorybookRoute(ctx.pathname, ctx.projectId)) {
+        effects.bumpStorybookOverview = true;
+        effects.toast = {
+          message: "Component refined successfully",
+          variant: "success",
+        };
+      }
+      break;
+    }
+
+    case "component_failed": {
+      if (isOnStorybookRoute(ctx.pathname, ctx.projectId)) {
+        effects.bumpStorybookOverview = true;
+        effects.toast = {
+          message: "Component refinement failed — check the error and try again",
+          variant: "warning",
+        };
+      }
+      break;
+    }
+
     default:
       break;
   }
