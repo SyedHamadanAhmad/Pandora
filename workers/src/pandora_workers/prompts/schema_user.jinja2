@@ -1,4 +1,4 @@
-You are producing a **design schema** (tokens + component specs) for a React design-system generator.
+You are producing a **design schema** (tokens + component specs) for a professional React design-system generator.
 
 ## Brief context (JSON)
 
@@ -8,23 +8,41 @@ You are producing a **design schema** (tokens + component specs) for a React des
 
 Return a **single JSON object** with **exactly** these keys:
 
-- `design_tokens` (object): merge `color_tokens` from the brief with `primary`, `on_primary` (readable text on primary — light on dark primaries, dark on light), `radius`, and nested `typography` / `spacing`. Include `text`, `text_muted`, `surface`, `on_surface` when possible. Prefer hex from the brief.
-- `global_config` (object): e.g. `{"theme": "light"|"dark", "design_flavour": "<echo brief>"}` and any layout defaults.
-- `component_specs` (array, **at most 15** entries): one object per component name from `component_list` (in that order when possible). Each object must have:
-  - `name` (string, required): PascalCase component name (e.g. `Button`, `Hero`).
-  - `type` (string): semantic type e.g. `button`, `card`, `badge`, `input`, `navigation`, `modal`, `layout`, `hero`.
-  - `variants` (array of strings): at least `["default"]`; add `primary`, `secondary`, etc. when relevant (max 8 variants per component).
-  - `layout` (string or null): short hint e.g. `horizontal`, `vertical`, `grid`.
+- `design_tokens` (object): A complete, production-ready token set. Include ALL of the following:
+  - **Color roles**: `primary`, `on_primary`, `secondary`, `on_secondary`, `accent`, `on_accent`, `surface`, `on_surface`, `text`, `text_muted`, `error`, `on_error`. Prefer hex from the brief; infer from tone/industry otherwise.
+  - **Interactive surfaces**: `surface_hover` (slightly darker/tinted surface for hover states), `surface_subtle` (very light brand tint for backgrounds).
+  - **Border**: `border_color` (subtle separator, e.g. `rgba(0,0,0,0.08)` or a neutral gray).
+  - **Elevation shadows**: `shadow_sm` (e.g. `"0 1px 3px 0 rgba(0,0,0,0.10), 0 1px 2px -1px rgba(0,0,0,0.10)"`), `shadow_md` (e.g. `"0 4px 12px 0 rgba(0,0,0,0.12), 0 2px 4px -2px rgba(0,0,0,0.08)"`).
+  - **Border radius**: `radius` (base, e.g. `"8px"`), `radius_sm` (e.g. `"4px"`), `radius_lg` (e.g. `"12px"`), `radius_full` (`"9999px"`).
+  - **Typography**: nested `typography` object with `font_sans` (brand font or system-ui), `font_size_sm` (`"0.8rem"`), `font_size_base` (`"0.95rem"`), `font_size_lg` (`"1.125rem"`), `line_height_tight` (`1.25`), `line_height_base` (`1.55`).
+  - **Spacing**: nested `spacing` object with `unit` (4), and named steps `xs` (`"4px"`), `sm` (`"8px"`), `md` (`"16px"`), `lg` (`"24px"`), `xl` (`"32px"`), `2xl` (`"48px"`).
 
-API contracts for codegen (use matching `type`):
-- `button`: required `label`; optional `onClick` handler (label-only, not `children`)
+- `global_config` (object): `{"theme": "light"|"dark", "design_flavour": "<echo brief>"}` and any layout defaults.
+
+- `component_specs` (array, **at most 15** entries): one object per component name from `component_list`. Each object must have:
+  - `name` (string, required): PascalCase (e.g. `Button`, `HeroSection`).
+  - `type` (string): semantic type — `button`, `card`, `badge`, `input`, `navigation`, `modal`, `hero`, `layout`, or `generic` for everything else.
+  - `variants` (array of objects): at least one. Each variant object has `name` (string) and `style_hint` (string describing the intended visual treatment). Examples:
+    - `{"name": "primary", "style_hint": "solid primary color fill, white text, brand shadow"}`
+    - `{"name": "secondary", "style_hint": "muted surface background, dark text, subtle border"}`
+    - `{"name": "outline", "style_hint": "transparent background, primary color border and text"}`
+    - `{"name": "ghost", "style_hint": "transparent background, no border, primary color text, tinted hover"}`
+    - `{"name": "danger", "style_hint": "red/error fill, white text"}`
+  - `layout` (string or null): short hint e.g. `horizontal`, `vertical`, `grid`.
+  - `props` (object or null): optional prop defaults for the demo preview. String values should be realistic UI copy.
+
+API contracts for codegen — use matching `type` to avoid contract failures:
+- `button`: required `label`; optional `onClick` handler (label-only, no `children`)
 - `card`: required `title`; optional body `children`
 - `badge`: required `text`
 - `input`: required `label`
 - `navigation`: required `items` (string array)
-- `modal` / `hero` / `layout`: required `title`
+- `modal`: required `title`; optional `children`, `open`
+- `hero`: required `title`; optional `subtitle`
+- `layout`: required `title`; optional `children`
+- `generic`: no required props — use whatever makes sense for the component
 
-If `component_list` is empty, emit **one** minimal spec: `{"name": "Button", "type": "button", "variants": ["primary"], "layout": null}`.
+If `component_list` is empty, emit **one** minimal spec: `{"name": "Button", "type": "button", "variants": [{"name": "primary", "style_hint": "solid primary fill"}], "layout": null}`.
 
 Do not include keys other than the three above.
 

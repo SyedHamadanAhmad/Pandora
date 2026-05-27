@@ -1,10 +1,13 @@
-You are generating **one React component** for a design-system POC.
+You are generating **one production-quality React component** for a professional design system.
 
 ## Component spec (JSON)
 
 {{ spec_json }}
 
 ## Design tokens (JSON)
+Use these as CSS variable names — the Sandpack preview injects them into `:root`.
+Every `primary` → `var(--primary)`, `on_primary` → `var(--on-primary)`, `surface` → `var(--surface)`, etc.
+All snake_case token keys map to kebab CSS vars: `text_muted` → `var(--text-muted)`, `border_color` → `var(--border-color)`, `shadow_sm` → `var(--shadow-sm)`.
 
 {{ design_tokens_json }}
 
@@ -28,28 +31,90 @@ You are generating **one React component** for a design-system POC.
 
 ---
 
-## Type-specific markup (spec type: {{ spec_type }})
+## Type-specific requirements (spec type: {{ spec_type }})
 
 {% if spec_type == 'button' %}
-- Label-only API: required `label: string` and `onClick?: () => void` — do not use `children`.
-- Render `<button type="button" onClick={onClick}>{label}</button>`.
-- Variants must differ using design tokens; include hover, focus-visible, disabled in CSS.
-- Primary/solid fills: `background: var(--primary)` with `color: var(--on-primary)` (from design_tokens). Never dark text on primary-colored backgrounds.
+**Button** — label-only API, never `children`.
+
+CSS must include ALL of the following CSS rules:
+- `.pandora-{{ component_name_lower }}` — base: padding, background `var(--primary)`, color `var(--on-primary)`, border-radius, font-weight 600, cursor pointer, border none, `transition: background 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease`.
+- `.pandora-{{ component_name_lower }}:hover` — lighter/brighter treatment: `filter: brightness(1.08)` or lighter background token.
+- `.pandora-{{ component_name_lower }}:active` — pressed: `transform: translateY(1px); box-shadow: none`.
+- `.pandora-{{ component_name_lower }}:focus-visible` — `outline: 2px solid var(--primary); outline-offset: 2px`.
+- `.pandora-{{ component_name_lower }}:disabled` — `opacity: 0.45; cursor: not-allowed; pointer-events: none`.
+- One rule per variant class: `--primary` (solid fill), `--secondary` (muted bg), `--outline` (border, transparent bg, primary text), `--ghost` (transparent, no border, primary text). Each MUST differ in background, color, and border.
+
 {% elif spec_type == 'card' %}
-- Root: `<article>` with header + body; border/shadow from tokens.
+**Card** — `<article>` root with header + optional body children.
+
+CSS must include:
+- Base card: `background: var(--surface); border-radius: var(--radius, 8px); box-shadow: var(--shadow-sm, 0 1px 3px rgba(0,0,0,0.10)); border: 1px solid var(--border-color, rgba(0,0,0,0.08)); overflow: hidden`.
+- Header: `padding: <spacing>; font-weight: 600; letter-spacing: -0.01em; border-bottom: 1px solid var(--border-color, rgba(0,0,0,0.08))`.
+- Body: adequate padding, `color: var(--text-muted)`, readable `line-height: 1.55`.
+- If variants exist: e.g. `--elevated` uses a stronger shadow; `--flat` removes shadow and uses only border; `--featured` uses `var(--primary)` as header background.
+- Hover (if interactive): `box-shadow: var(--shadow-md, 0 4px 12px rgba(0,0,0,0.12)); transform: translateY(-1px); transition: all 0.15s ease`.
+
 {% elif spec_type == 'badge' %}
-- Root: `<span>` (inline); compact padding; token-based colors.
+**Badge** — `<span>` inline pill.
+
+CSS must include:
+- Base: `display: inline-flex; align-items: center; padding: 0.2em 0.65em; border-radius: 999px; font-size: 0.72rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; white-space: nowrap`.
+- Variant rules: `--default` (surface bg, muted text border), `--primary` (var(--primary) bg, var(--on-primary) text), `--success` (green tones), `--warning` (amber), `--danger` (red). Each must use a different bg/text pair.
+
 {% elif spec_type == 'navigation' %}
-- `<nav>` with `<ul>` / `<li>`; active link state.
+**Navigation** — `<nav>` with `<ul>`/`<li>` list.
+
+CSS must include:
+- Nav wrapper: appropriate flex or horizontal layout, gap, background if needed.
+- Link base: `color: var(--text-muted); text-decoration: none; font-weight: 500; padding: 0.4em 0.75em; border-radius: var(--radius-sm, 4px); transition: color 0.15s, background 0.15s`.
+- Link hover: `color: var(--primary); background: rgba(var(--primary), 0.06)` or a light primary tint.
+- Link active (`.is-active`): `color: var(--primary); font-weight: 600; background: …`.
+- If variant `vertical`: stack items with left border active indicator.
+
 {% elif spec_type == 'input' %}
-- `<label htmlFor>` + `<input id>`.
+**Input field** — `<label htmlFor>` + `<input id>`.
+
+CSS must include:
+- Wrapper: `display: flex; flex-direction: column; gap: <spacing>`.
+- Label: `font-size: 0.8rem; font-weight: 600; letter-spacing: 0.03em; color: var(--text, #0f172a)`.
+- Input: `padding: 0.55em 0.85em; border: 1px solid var(--border-color, #cbd5e1); border-radius: var(--radius, 6px); font-size: 0.95rem; background: var(--surface); color: var(--text); transition: border-color 0.15s, box-shadow 0.15s; width: 100%; box-sizing: border-box`.
+- Input focus: `border-color: var(--primary); box-shadow: 0 0 0 3px rgba(var(--primary-rgb, 37 99 235) / 0.15); outline: none`.
+- Error state: `border-color: var(--error, #dc2626)`.
+- Error message: `font-size: 0.78rem; color: var(--error, #dc2626)`.
+
 {% elif spec_type == 'modal' %}
-- `role="dialog"`, labelled title, overlay + panel.
-{% elif spec_type == 'hero' or spec_type == 'layout' %}
-- `<section>` and heading hierarchy.
+**Modal** — overlay + centered dialog panel.
+
+CSS must include:
+- Overlay: `position: fixed; inset: 0; background: rgba(0,0,0,0.45); display: flex; align-items: center; justify-content: center; z-index: 50; backdrop-filter: blur(2px)`.
+- Panel: `background: var(--surface); border-radius: calc(var(--radius, 8px) * 1.5); box-shadow: 0 20px 60px rgba(0,0,0,0.22); max-width: 32rem; width: 90%; padding: 1.75rem; position: relative`.
+- Title: `font-size: 1.15rem; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 0.75rem`.
+- When `open` is false, render null or return null.
+
+{% elif spec_type == 'hero' %}
+**Hero section** — large page-top section.
+
+CSS must include:
+- Section: `padding: 5rem 2rem; text-align: center; background: var(--surface)`.
+- Headline: `font-size: clamp(2rem, 5vw, 3.5rem); font-weight: 800; letter-spacing: -0.03em; line-height: 1.1; color: var(--text)`.
+- Subtitle: `font-size: 1.15rem; color: var(--text-muted); line-height: 1.6; max-width: 38rem; margin: 1rem auto 0`.
+- CTA area: flex row, gap, centered.
+
+{% elif spec_type == 'layout' %}
+**Layout / Section** — semantic content container.
+
+CSS must include:
+- Section container: `padding: 4rem 2rem; max-width: 72rem; margin: 0 auto`.
+- Section heading: `font-size: 1.6rem; font-weight: 700; letter-spacing: -0.02em; color: var(--text); margin-bottom: 0.5rem`.
+- Optional subtitle: `color: var(--text-muted); line-height: 1.55`.
+
 {% else %}
-- Semantic HTML for type "{{ spec_type }}" and {{ component_name }}.
+**{{ component_name }}** (type: {{ spec_type }}) — produce semantic HTML appropriate to its purpose.
+Use BEM-style CSS within the `pandora-{{ component_name_lower }}` namespace.
+Include hover states, transitions, and token-based colors as described in the quality contract.
 {% endif %}
+
+---
 
 {% include 'component_api_contract.jinja2' with context %}
 
@@ -57,11 +122,13 @@ You are generating **one React component** for a design-system POC.
 
 ---
 
+## Output requirements
+
 Return a **single JSON object** with **exactly** these keys:
 
-- `tsx_code` (string, required): React 18 + TypeScript. `export function {{ component_name }}(...)`. Import `react` for `ReactNode` when needed. `className` prefix `pandora-{{ component_name_lower }}`.
-- `css_code` (string or null): Scoped CSS.
-- `props` (object): Demo values for **all required** API props (e.g. `label`, `text`, `title` strings for previews; omit `onClick` or use null).
-- `variants` (array of strings): From spec or `["default"]`.
+- `tsx_code` (string, required): React 18 + TypeScript. Must `export function {{ component_name }}(...)`. Import `type { ReactNode }` from `'react'` only when needed. All classNames use prefix `pandora-{{ component_name_lower }}`.
+- `css_code` (string, required — never null for interactive components): Scoped CSS using `pandora-{{ component_name_lower }}` prefix. Must include hover, focus-visible, disabled, and one rule per variant.
+- `props` (object): Demo values for ALL required props. String values should be realistic UI copy (not "string" or "test"). Arrays should have 3–4 real items.
+- `variants` (array of strings): exactly the variants from spec (or `["default"]` if none).
 
-Do not include keys other than the four above.
+Do not include keys other than the four above. Do not wrap the JSON in markdown fences.

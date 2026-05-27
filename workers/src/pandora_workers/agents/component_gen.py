@@ -574,10 +574,19 @@ class ComponentGenAgent(BaseAgent):
         tokens_dict = design_tokens if isinstance(design_tokens, dict) else None
         api_ctx = prompt_context_for_type(spec_type)
 
+        # Attach variant style hints to the spec JSON sent to the prompt so the
+        # LLM can read them in context alongside the variant list.
+        spec_for_prompt = dict(spec)
+        style_hints: dict[str, str] = {}
+        if isinstance(spec.get("variant_style_hints"), dict):
+            style_hints = spec["variant_style_hints"]
+        if style_hints:
+            spec_for_prompt["variant_style_hints"] = style_hints
+
         system = render_prompt("component_engineer_system.jinja2")
         user = render_prompt(
             "component_gen_user.jinja2",
-            spec_json=_json_for_prompt(spec),
+            spec_json=_json_for_prompt(spec_for_prompt),
             design_tokens_json=_json_for_prompt(design_tokens or {}),
             typography_json=_json_for_prompt(_typography_for_prompt(tokens_dict, global_config)),
             spacing_json=_json_for_prompt(_spacing_for_prompt(tokens_dict, global_config)),

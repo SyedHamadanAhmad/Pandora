@@ -120,14 +120,36 @@ _CONTRACTS: dict[str, ComponentApiContract] = {
             "Use semantic section layout.",
         ),
     ),
+    # Generic type: no required props, use whatever makes sense for the component.
+    # Unknown/exotic components (Dropdown, Toggle, Accordion, etc.) map here to avoid
+    # the layout contract forcing an irrelevant `title: string`.
+    "generic": ComponentApiContract(
+        type_key="generic",
+        required_props=(),
+        optional_props=(),
+        forbidden_patterns=(),
+        default_props={},
+        prompt_rules=(
+            "No fixed required props — design the props that best fit the component's purpose.",
+            "Use semantic HTML appropriate to the component type.",
+            "Include variant classes in CSS for each variant in the spec.",
+        ),
+    ),
 }
+
+
+_KNOWN_TYPES = frozenset(
+    {"button", "card", "badge", "input", "navigation", "modal", "hero", "layout", "generic"}
+)
 
 
 def infer_spec_type(spec: dict[str, Any]) -> str:
     """Resolve semantic type from spec ``type`` or component ``name``."""
     raw = spec.get("type")
     if isinstance(raw, str) and raw.strip():
-        return raw.strip().lower()
+        candidate = raw.strip().lower()
+        # Return any recognised type as-is; unknown types become generic.
+        return candidate if candidate in _KNOWN_TYPES else "generic"
     name = str(spec.get("name") or "").lower()
     if "button" in name or "cta" in name:
         return "button"
@@ -143,7 +165,10 @@ def infer_spec_type(spec: dict[str, Any]) -> str:
         return "modal"
     if "hero" in name or "banner" in name:
         return "hero"
-    return "layout"
+    if "section" in name or "layout" in name or "page" in name or "container" in name:
+        return "layout"
+    # Everything else (Dropdown, Toggle, Accordion, DataTable, etc.) is generic.
+    return "generic"
 
 
 def contract_for_type(spec_type: str) -> ComponentApiContract:

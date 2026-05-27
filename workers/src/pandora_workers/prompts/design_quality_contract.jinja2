@@ -1,7 +1,29 @@
-Design Quality Contract (mandatory):
-1. Tokens: Every color in CSS must come from design_tokens (CSS variables or mapped hex). No ad-hoc grays unless defined as neutral in tokens.
-2. Typography: Use fontFamily and scale from design_tokens / typography_scale; minimum body 14px; clear heading hierarchy.
-3. Spacing: Use spacing_system.unit multiples (4px grid default) for padding, margin, and gap.
-4. Components: PascalCase exports; typed props; variants must change visual state (not label text alone).
-5. Accessibility: Focus-visible ring on interactive elements; contrast ratio at least 4.5:1 for text on backgrounds. On primary/accent fills use `color: var(--on-primary)` or `var(--on-accent)` — never body `var(--text)` or `#000`/`#334155` on `var(--primary)` backgrounds.
-6. Scope: No external UI libraries; import react only when needed; className prefix pandora-{componentname} (lowercase component name).
+Design Quality Contract (mandatory — every rule enforced):
+
+1. **Token fidelity**: Every color value in CSS must come from a design token CSS variable (e.g. `var(--primary)`, `var(--surface)`, `var(--border-color)`). Never write raw hex like `#e2e8f0` or `#334155` unless the token system has no border/neutral token — use `var(--text-muted)` for muted grays.
+
+2. **Typography polish**: Apply `font-weight: 600; letter-spacing: -0.015em` on headings. Apply `font-size: 0.75rem; letter-spacing: 0.04em; text-transform: uppercase` on labels and section titles. Body text uses `line-height: 1.55`. Set `font-family: inherit` so the parent sans-serif propagates.
+
+3. **Spacing rhythm**: Use only multiples of `spacing_system.unit` (default 4 px) for padding, margin, and gap. Compact elements: 2–3 units vertical, 3–4 units horizontal. Comfortable cards: 4–6 units all sides.
+
+4. **Transitions on every interactive element**: All buttons, links, inputs, and interactive cards must have `transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease`.
+
+5. **Hover and active states**: Hover = slightly lighter or darker background (e.g. `filter: brightness(1.08)` or explicit lighter/darker token). Active/pressed = 1–2 px translateY + deeper shadow. These must be in CSS, not just documented.
+
+6. **Variant visual distinction** (critical): Each variant class (e.g. `.pandora-button--secondary`, `.pandora-button--outline`, `.pandora-button--ghost`) MUST have a distinct combination of `background`, `color`, and `border`. Do NOT use opacity or scale alone to differentiate.
+   - `primary` / `solid` → filled with `var(--primary)` background, `var(--on-primary)` text, no border.
+   - `secondary` → `var(--secondary)` or muted-surface background, contrasting text.
+   - `outline` → transparent background, `1–2px solid var(--primary)` border, `var(--primary)` text.
+   - `ghost` → transparent background, no border, `var(--primary)` text, hover shows a light-tinted background.
+   - `danger` → red/error fill or outline.
+   - Any other variant → visually distinct from all the above.
+
+7. **Elevation**: Cards, modals, and panels must have `box-shadow`. Use at minimum a soft shadow like `0 1px 3px 0 rgba(0,0,0,0.10), 0 1px 2px -1px rgba(0,0,0,0.10)`. Buttons may use `0 1px 2px 0 rgba(0,0,0,0.08)` on default and remove it on ghost/outline.
+
+8. **Focus-visible ring**: `outline: 2px solid var(--primary); outline-offset: 2px` on `:focus-visible`. Never `outline: none` without a replacement.
+
+9. **Disabled state**: `opacity: 0.45; cursor: not-allowed; pointer-events: none` — always on disabled interactive elements.
+
+10. **Accessibility contrast**: On any `var(--primary)` or `var(--accent)` filled background, text must be `var(--on-primary)` or `var(--on-accent)`. Never `#000`, `#334155`, or `var(--text)` on a dark primary background.
+
+11. **Scope**: No external UI libraries. No global selectors. className prefix must be `pandora-{componentname}` (all lowercase). Import `react` only when `ReactNode` is needed.

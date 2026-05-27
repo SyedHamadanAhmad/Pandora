@@ -62,10 +62,22 @@ def _guess_component_type(name: str) -> str:
     if "modal" in key or "dialog" in key:
         return "modal"
     if "hero" in key or "banner" in key:
+        return "hero"
+    if "section" in key or "layout" in key or "page" in key or "container" in key:
         return "layout"
-    if "list" in key or "grid" in key:
-        return "layout"
-    return "layout"
+    # Dropdowns, toggles, accordions, tables, tooltips, etc. are generic.
+    return "generic"
+
+
+def _extract_variant_name(v: Any) -> str | None:
+    """Accept both plain strings and {name, style_hint} variant objects."""
+    if isinstance(v, str) and v.strip():
+        return v.strip()
+    if isinstance(v, dict):
+        n = v.get("name")
+        if isinstance(n, str) and n.strip():
+            return n.strip()
+    return None
 
 
 def _normalize_spec(raw: dict[str, Any]) -> dict[str, Any]:
@@ -73,13 +85,14 @@ def _normalize_spec(raw: dict[str, Any]) -> dict[str, Any]:
     name = re.sub(r"\s+", "", name)
     if not name[0].isalpha():
         name = f"C{name}" if name else "Component"
-    variants = raw.get("variants") or ["default"]
-    if not isinstance(variants, list):
-        variants = ["default"]
+    raw_variants = raw.get("variants") or ["default"]
+    if not isinstance(raw_variants, list):
+        raw_variants = ["default"]
     clean_variants: list[str] = []
-    for v in variants:
-        if isinstance(v, str) and v.strip() and v.strip() not in clean_variants:
-            clean_variants.append(v.strip())
+    for v in raw_variants:
+        extracted = _extract_variant_name(v)
+        if extracted and extracted not in clean_variants:
+            clean_variants.append(extracted)
         if len(clean_variants) >= _MAX_VARIANTS:
             break
     if not clean_variants:
@@ -90,6 +103,16 @@ def _normalize_spec(raw: dict[str, Any]) -> dict[str, Any]:
     layout = raw.get("layout")
     if layout is not None and not isinstance(layout, str):
         layout = str(layout)
+
+    # Build style_hints map from variant objects so component_gen can use them.
+    style_hints: dict[str, str] = {}
+    for v in raw_variants:
+        if isinstance(v, dict):
+            vname = _extract_variant_name(v)
+            hint = v.get("style_hint") or v.get("styleHint")
+            if vname and isinstance(hint, str) and hint.strip():
+                style_hints[vname] = hint.strip()[:200]
+
     out: dict[str, Any] = {
         "name": name[:120],
         "type": typ.strip()[:64],
@@ -97,6 +120,12 @@ def _normalize_spec(raw: dict[str, Any]) -> dict[str, Any]:
     }
     if layout is not None:
         out["layout"] = layout.strip()[:120] or None
+    if style_hints:
+        out["variant_style_hints"] = style_hints
+    # Forward any prop defaults the schema agent produced.
+    spec_props = raw.get("props")
+    if isinstance(spec_props, dict) and spec_props:
+        out["props"] = spec_props
     return out
 
 
@@ -117,7 +146,7 @@ def _brief_snapshot(work: dict[str, Any]) -> dict[str, Any]:
 
 
 def _enrich_design_tokens(brief: dict[str, Any], llm_tokens: dict[str, Any]) -> dict[str, Any]:
-    """Merge brief colors + LLM tokens; always attach typography and spacing (W-03)."""
+    """Merge brief colors + LLM tokens; always attach typography, spacing, and elevation (W-03)."""
     colors = brief.get("color_tokens") if isinstance(brief.get("color_tokens"), dict) else {}
     typo = brief.get("typography_scale") if isinstance(brief.get("typography_scale"), dict) else {}
     spacing = (
@@ -128,15 +157,51 @@ def _enrich_design_tokens(brief: dict[str, Any], llm_tokens: dict[str, Any]) -> 
     out: dict[str, Any] = {**colors, **llm_tokens}
     if typo:
         out.setdefault("typography", typo)
-    if spacing:
-        out.setdefault("spacing", spacing)
+
+    # Normalised spacing with named steps always present.
+    if not out.get("spacing") or not isinstance(out.get("spacing"), dict):
+        unit = int(spacing.get("unit") or 4)
+        out["spacing"] = {
+            "unit": unit,
+            "xs": f"{unit}px",
+            "sm": f"{unit * 2}px",
+            "md": f"{unit * 4}px",
+            "lg": f"{unit * 6}px",
+            "xl": f"{unit * 8}px",
+            "2xl": f"{unit * 12}px",
+        }
+
+    # Border radius family.
     if not out.get("radius"):
         radius = llm_tokens.get("radius") if isinstance(llm_tokens.get("radius"), str) else None
         out["radius"] = radius or "8px"
+    out.setdefault("radius_sm", "4px")
+    out.setdefault("radius_lg", "12px")
+    out.setdefault("radius_full", "9999px")
+
+    # Elevation shadows — always present so CSS can reference var(--shadow-sm) etc.
+    out.setdefault(
+        "shadow_sm",
+        "0 1px 3px 0 rgba(0,0,0,0.10), 0 1px 2px -1px rgba(0,0,0,0.10)",
+    )
+    out.setdefault(
+        "shadow_md",
+        "0 4px 12px 0 rgba(0,0,0,0.12), 0 2px 4px -2px rgba(0,0,0,0.08)",
+    )
+    out.setdefault(
+        "shadow_lg",
+        "0 10px 40px -4px rgba(0,0,0,0.18), 0 4px 12px -4px rgba(0,0,0,0.10)",
+    )
+
+    # Border token.
+    out.setdefault("border_color", "rgba(0,0,0,0.08)")
+
+    # Primary color + semantic palette.
     if not out.get("primary") and isinstance(colors.get("primary"), str):
         out["primary"] = colors["primary"]
     if not out.get("primary"):
         out.setdefault("primary", "#2563eb")
+
     return enrich_semantic_color_tokens(out)
 
 
