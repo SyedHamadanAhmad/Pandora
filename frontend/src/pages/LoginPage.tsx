@@ -1,7 +1,6 @@
 import { FormEvent, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { login, register } from "../api/auth";
-import { setAuthed } from "../routes/ProtectedRoute";
 import "./LoginPage.css";
 
 export function LoginPage() {
@@ -22,7 +21,6 @@ export function LoginPage() {
         await register(email, password);
         await login(email, password);
       }
-      setAuthed(true);
       navigate("/projects");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Auth failed");

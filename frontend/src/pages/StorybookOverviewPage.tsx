@@ -1,8 +1,8 @@
 import { useMemo } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useOutletContext, useParams } from "react-router-dom";
 import { ComponentGrid } from "../features/storybook/ComponentGrid";
+import type { StorybookOutletContext } from "../features/storybook/StorybookShell";
 import { TokenLanding } from "../features/storybook/TokenLanding";
-import { useStorybookOverview } from "../hooks/useStorybookOverview";
 import { useStorybookStore } from "../stores/storybookStore";
 import "./StorybookOverviewPage.css";
 
@@ -10,10 +10,7 @@ export function StorybookOverviewPage() {
   const { projectId: projectIdParam } = useParams<{ projectId: string }>();
   const projectId = Number(projectIdParam);
   const setOverview = useStorybookStore((s) => s.setOverview);
-
-  const { overview, loading, error } = useStorybookOverview(
-    Number.isFinite(projectId) ? projectId : null,
-  );
+  const { overview, loading } = useOutletContext<StorybookOutletContext>();
 
   const specsByName = useMemo(() => {
     const map = new Map<string, { type?: string | null; variants: string[] }>();
@@ -30,19 +27,6 @@ export function StorybookOverviewPage() {
 
   if (loading && !overview) {
     return <p className="storybook-overview__status">Loading storybook…</p>;
-  }
-
-  if (error && !overview) {
-    return (
-      <div className="storybook-overview panel">
-        <p className="storybook-overview__error" role="alert">
-          {error}
-        </p>
-        <Link to="/projects" className="text-link text-link--strong">
-          Back to projects
-        </Link>
-      </div>
-    );
   }
 
   if (!overview) {

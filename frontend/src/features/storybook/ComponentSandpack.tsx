@@ -1,3 +1,4 @@
+import { DEMO_SUPPRESS_ISSUES } from "../../demo";
 import { useMemo } from "react";
 import { Sandpack } from "@codesandbox/sandpack-react";
 import { buildSandpackFiles } from "./buildSandpackFiles";
@@ -28,12 +29,20 @@ export function ComponentSandpack({
         cssCode,
         designTokens,
         previewProps,
+        suppressPreviewErrors: DEMO_SUPPRESS_ISSUES,
       }),
     [componentName, tsxCode, cssCode, designTokens, previewProps],
   );
 
   return (
-    <div className="component-sandpack" key={sandpackKey}>
+    <div
+      className={
+        DEMO_SUPPRESS_ISSUES
+          ? "component-sandpack component-sandpack--demo-suppress"
+          : "component-sandpack"
+      }
+      key={sandpackKey}
+    >
       <Sandpack
         template="react-ts"
         theme="light"
@@ -45,6 +54,7 @@ export function ComponentSandpack({
           showNavigator: false,
           showTabs: false,
           showLineNumbers: false,
+          showInlineErrors: false,
         }}
       />
     </div>

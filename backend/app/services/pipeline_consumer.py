@@ -1073,15 +1073,26 @@ def _component_outcome_sse_payload(
     sse_type: str,
     component_name: str,
 ) -> dict[str, Any]:
+    revision_round = 0
+    if envelope.attempt is not None:
+        revision_round = envelope.attempt.revision_round
+
+    payload = envelope.payload if isinstance(envelope.payload, dict) else {}
+    if revision_round > 0 or payload.get("storybook_ad_hoc"):
+        source = "storybook_revise"
+    else:
+        source = "pipeline"
+
     event: dict[str, Any] = {
         "type": sse_type,
         "projectId": envelope.project_id,
         "pipelineId": str(envelope.pipeline_id),
         "componentId": str(envelope.component_id),
         "componentName": component_name,
+        "revisionRound": revision_round,
+        "source": source,
     }
     if sse_type == "component_failed":
-        payload = envelope.payload if isinstance(envelope.payload, dict) else {}
         err = payload.get("error_reason") or payload.get("error")
         if err:
             event["error"] = _truncate_text(str(err), limit=280)

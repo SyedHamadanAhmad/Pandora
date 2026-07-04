@@ -1,3 +1,4 @@
+import { DEMO_SUPPRESS_ISSUES } from "../demo";
 import { useCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
@@ -19,7 +20,7 @@ function applyEffects(
   effects: PipelineSseEffects,
   projectId: number,
   navigate: ReturnType<typeof useNavigate>,
-  markNavigatedToStorybook: () => void,
+  markNavigatedToStorybook: (id: number) => void,
   bumpStorybookOverview: () => void,
   toast: ReturnType<typeof useToast>,
 ): void {
@@ -27,12 +28,12 @@ function applyEffects(
     navigate(`/projects/${projectId}/storybook`);
   }
   if (effects.markNavigated) {
-    markNavigatedToStorybook();
+    markNavigatedToStorybook(projectId);
   }
   if (effects.bumpStorybookOverview) {
     bumpStorybookOverview();
   }
-  if (effects.toast) {
+  if (effects.toast && !DEMO_SUPPRESS_ISSUES) {
     toast[effects.toast.variant](effects.toast.message);
   }
 }
@@ -47,8 +48,8 @@ export function usePipelineProjectSse({
   const navigate = useNavigate();
   const location = useLocation();
   const toast = useToast();
-  const hasNavigatedToStorybook = usePipelineStore(
-    (s) => s.hasNavigatedToStorybook,
+  const navigatedStorybookForProjectId = usePipelineStore(
+    (s) => s.navigatedStorybookForProjectId,
   );
   const markNavigatedToStorybook = usePipelineStore(
     (s) => s.markNavigatedToStorybook,
@@ -67,7 +68,7 @@ export function usePipelineProjectSse({
           {
             projectId,
             pathname: location.pathname,
-            hasNavigatedToStorybook,
+            navigatedStorybookForProjectId,
           },
           prev,
         );
@@ -89,7 +90,7 @@ export function usePipelineProjectSse({
     [
       projectId,
       location.pathname,
-      hasNavigatedToStorybook,
+      navigatedStorybookForProjectId,
       setRun,
       navigate,
       markNavigatedToStorybook,

@@ -1,3 +1,4 @@
+import { DEMO_SUPPRESS_ISSUES } from "../../demo";
 import { useEffect, useMemo, useState } from "react";
 import { patchStorybookTokens } from "../../api/storybook";
 import type { StorybookOverview } from "../../api/types";
@@ -84,10 +85,14 @@ export function TokenLanding({ projectId, overview, onSaved }: TokenLandingProps
       <header className="token-landing__header">
         <h1 className="token-landing__title">Design system</h1>
         <p className="token-landing__meta">
-          {overview.summary.validated} validated · {overview.summary.failed} failed ·{" "}
-          {overview.summary.generating > 0
-            ? `${overview.summary.generating} generating · `
+          {overview.summary.validated + (DEMO_SUPPRESS_ISSUES ? overview.summary.failed : 0)} validated
+          {!DEMO_SUPPRESS_ISSUES && overview.summary.failed > 0
+            ? ` · ${overview.summary.failed} failed`
             : ""}
+          {overview.summary.generating > 0
+            ? ` · ${overview.summary.generating} generating`
+            : ""}
+          {" · "}
           {overview.summary.total} components
         </p>
       </header>

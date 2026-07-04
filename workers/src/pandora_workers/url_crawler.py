@@ -38,6 +38,13 @@ async def crawl_urls(urls: list[str]) -> list[CrawlPageResult]:
     async with AsyncWebCrawler(verbose=False) as crawler:
         for url in urls:
             try:
+                from pandora_shared.url_validation import assert_safe_http_url
+
+                assert_safe_http_url(url)
+            except ValueError:
+                logger.warning("blocked unsafe crawl url=%s", url)
+                continue
+            try:
                 page = await crawler.arun(url=url)
             except Exception:
                 logger.exception("crawl failed url=%s", url)

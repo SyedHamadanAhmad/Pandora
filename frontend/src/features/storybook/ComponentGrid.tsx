@@ -1,3 +1,4 @@
+import { DEMO_SUPPRESS_ISSUES, demoComponentStatus } from "../../demo";
 import { Link } from "react-router-dom";
 import type { StorybookComponentSummary } from "../../api/types";
 import { ComponentRetryButton } from "../../components/ComponentRetryButton";
@@ -36,7 +37,8 @@ export function ComponentGrid({
       <ul className="component-grid__list">
         {components.map((component) => {
           const spec = specsByName.get(component.name);
-          const showRetry = component.status === "failed";
+          const showRetry = component.status === "failed" && !DEMO_SUPPRESS_ISSUES;
+          const displayStatus = demoComponentStatus(component.status);
           const retryBusy = isRevisePending(component.id);
           const isBusy =
             retryBusy ||
@@ -68,7 +70,7 @@ export function ComponentGrid({
                         disabled={isBusy && !retryBusy}
                       />
                     ) : null}
-                    <ComponentStatusIcon status={component.status} />
+                      <ComponentStatusIcon status={displayStatus} />
                   </div>
                 </div>
                 <Link
@@ -87,7 +89,7 @@ export function ComponentGrid({
                       ))}
                     </ul>
                   ) : null}
-                  {component.errorReason ? (
+                  {!DEMO_SUPPRESS_ISSUES && component.errorReason ? (
                     <p
                       className="component-grid__error"
                       title={component.errorReason}

@@ -5,7 +5,8 @@ import type { ComponentsReadySource } from "../api/types";
 export interface PipelineSseContext {
   projectId: number;
   pathname: string;
-  hasNavigatedToStorybook: boolean;
+  /** Project id already auto-navigated to storybook; null if none. */
+  navigatedStorybookForProjectId: number | null;
 }
 
 export interface PipelineSseEffects {
@@ -13,12 +14,12 @@ export interface PipelineSseEffects {
   nextRun?: PipelineRunState;
   /** Navigate to storybook overview for this project. */
   navigateToStorybook?: boolean;
-  /** Mark navigation dedupe flag. */
+  /** Mark navigation dedupe flag for this project. */
   markNavigated?: boolean;
   /** Bump storybook overview refetch counter. */
   bumpStorybookOverview?: boolean;
   /** Toast after pipeline_complete when already on storybook. */
-  toast?: { message: string; variant: "success" };
+  toast?: { message: string; variant: "success" | "warning" };
 }
 
 const PIPELINE_RUN_EVENT_TYPES = new Set([
@@ -32,12 +33,27 @@ function isOnStorybookRoute(pathname: string, projectId: number): boolean {
   return pathname.includes(`/projects/${projectId}/storybook`);
 }
 
+function hasNavigatedForProject(ctx: PipelineSseContext): boolean {
+  return ctx.navigatedStorybookForProjectId === ctx.projectId;
+}
+
 function shouldNavigateOnComponentsReady(
   source: ComponentsReadySource | string | undefined,
-  hasNavigated: boolean,
+  ctx: PipelineSseContext,
 ): boolean {
-  if (hasNavigated) return false;
+  if (hasNavigatedForProject(ctx)) return false;
   return source === "pipeline" || source === "pipeline_complete";
+}
+
+function isStorybookUserAction(event: Record<string, unknown>): boolean {
+  const source = event.source as string | undefined;
+  const revisionRound =
+    event.revisionRound != null ? Number(event.revisionRound) : 0;
+  return (
+    source === "storybook_revise" ||
+    source === "storybook_regen" ||
+    revisionRound > 0
+  );
 }
 
 /**
@@ -57,7 +73,7 @@ export function handleProjectSse(
   switch (event.type) {
     case "components_ready": {
       const source = event.source as ComponentsReadySource | string | undefined;
-      if (shouldNavigateOnComponentsReady(source, ctx.hasNavigatedToStorybook)) {
+      if (shouldNavigateOnComponentsReady(source, ctx)) {
         effects.navigateToStorybook = true;
         effects.markNavigated = true;
       }
@@ -77,7 +93,7 @@ export function handleProjectSse(
       if (isOnStorybookRoute(ctx.pathname, ctx.projectId)) {
         effects.toast = { message: "Pipeline finished", variant: "success" };
         effects.bumpStorybookOverview = true;
-      } else if (!ctx.hasNavigatedToStorybook) {
+      } else if (!hasNavigatedForProject(ctx)) {
         effects.navigateToStorybook = true;
         effects.markNavigated = true;
       }
@@ -94,10 +110,12 @@ export function handleProjectSse(
     case "component_validated": {
       if (isOnStorybookRoute(ctx.pathname, ctx.projectId)) {
         effects.bumpStorybookOverview = true;
-        effects.toast = {
-          message: "Component refined successfully",
-          variant: "success",
-        };
+        if (isStorybookUserAction(event)) {
+          effects.toast = {
+            message: "Component updated successfully",
+            variant: "success",
+          };
+        }
       }
       break;
     }
@@ -105,10 +123,13 @@ export function handleProjectSse(
     case "component_failed": {
       if (isOnStorybookRoute(ctx.pathname, ctx.projectId)) {
         effects.bumpStorybookOverview = true;
-        effects.toast = {
-          message: "Component refinement failed — check the error and try again",
-          variant: "warning",
-        };
+        if (isStorybookUserAction(event)) {
+          effects.toast = {
+            message:
+              "Component refinement failed — check the error and try again",
+            variant: "warning",
+          };
+        }
       }
       break;
     }

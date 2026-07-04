@@ -17,6 +17,7 @@ from pandora_shared.sse_events import (  # noqa: E402
     DESIGN_BRIEF_READY,
     PIPELINE_COMPLETE,
     SCHEMA_READY,
+    SSE_REPLAY_COMPLETE,
     STORYBOOK_SSE_EVENT_TYPES,
     TOKEN_REGENERATION_STARTED,
 )
@@ -26,6 +27,7 @@ class SseEventsTests(unittest.TestCase):
     def test_storybook_events_in_registry(self) -> None:
         self.assertIn(TOKEN_REGENERATION_STARTED, STORYBOOK_SSE_EVENT_TYPES)
         self.assertIn(COMPONENT_REVISION_STARTED, STORYBOOK_SSE_EVENT_TYPES)
+        self.assertIn(SSE_REPLAY_COMPLETE, STORYBOOK_SSE_EVENT_TYPES)
 
     def test_pipeline_complete_not_project_completed(self) -> None:
         self.assertEqual(PIPELINE_COMPLETE, "pipeline_complete")

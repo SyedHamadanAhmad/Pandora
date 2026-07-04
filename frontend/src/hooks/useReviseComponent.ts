@@ -1,3 +1,4 @@
+import { DEMO_SUPPRESS_ISSUES } from "../demo";
 import { useCallback, useState } from "react";
 import { reviseComponent } from "../api/storybook";
 import { useToast } from "../components/Toast/ToastContext";
@@ -20,20 +21,19 @@ export function useReviseComponent(projectId: number | null) {
 
       const validationError = validateRefineMessage(message);
       if (validationError) {
-        toast.error(validationError);
+        if (!DEMO_SUPPRESS_ISSUES) toast.error(validationError);
         return false;
       }
 
       setPendingIds((prev) => new Set(prev).add(componentId));
       try {
         await reviseComponent(projectId, componentId, message.trim());
-        toast.success("Refining component…");
         bumpOverview();
         return true;
       } catch (err) {
         const detail =
           err instanceof Error ? err.message : "Could not start refinement";
-        toast.error(detail);
+        if (!DEMO_SUPPRESS_ISSUES) toast.error(detail);
         return false;
       } finally {
         setPendingIds((prev) => {

@@ -18,3 +18,12 @@
   flex: 1;
   min-height: 18rem;
 }
+
+/* Demo recording: hide Sandpack compile/runtime error overlays */
+.component-sandpack--demo-suppress .sp-wrapper [class*="overlay"] {
+  display: none !important;
+}
+
+.component-sandpack--demo-suppress .sp-wrapper [class*="error-message"] {
+  display: none !important;
+}

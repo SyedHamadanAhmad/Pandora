@@ -1,3 +1,4 @@
+import { DEMO_SUPPRESS_ISSUES } from "../../demo";
 import { useState } from "react";
 import {
   MAX_REFINE_MESSAGE_LEN,
@@ -64,7 +65,7 @@ export function RefineComponentPanel({
         <span className="refine-panel__count text-muted" aria-live="polite">
           {remaining} characters left
         </span>
-        {fieldError ? (
+        {fieldError && !DEMO_SUPPRESS_ISSUES ? (
           <p className="refine-panel__error" role="alert">
             {fieldError}
           </p>

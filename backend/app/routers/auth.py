@@ -64,6 +64,11 @@ async def login(
     return response
 
 
+@router.get("/me", response_model=AuthResponse)
+async def me(user_id: int = Depends(get_current_user_id)) -> AuthResponse:
+    return AuthResponse(user_id=user_id)
+
+
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
 async def logout(
     pandora_session: str | None = Cookie(default=None, alias=SESSION_COOKIE),

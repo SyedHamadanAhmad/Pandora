@@ -1,14 +1,15 @@
 import { create } from "zustand";
 
 interface PipelineStore {
-  /** Avoid duplicate navigate on components_ready + pipeline_complete */
-  hasNavigatedToStorybook: boolean;
-  markNavigatedToStorybook: () => void;
+  /** Last project id auto-navigated to storybook; null if none. */
+  navigatedStorybookForProjectId: number | null;
+  markNavigatedToStorybook: (projectId: number) => void;
   reset: () => void;
 }
 
 export const usePipelineStore = create<PipelineStore>((set) => ({
-  hasNavigatedToStorybook: false,
-  markNavigatedToStorybook: () => set({ hasNavigatedToStorybook: true }),
-  reset: () => set({ hasNavigatedToStorybook: false }),
+  navigatedStorybookForProjectId: null,
+  markNavigatedToStorybook: (projectId) =>
+    set({ navigatedStorybookForProjectId: projectId }),
+  reset: () => set({ navigatedStorybookForProjectId: null }),
 }));

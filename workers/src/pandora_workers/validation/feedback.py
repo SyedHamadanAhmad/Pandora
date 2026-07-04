@@ -142,7 +142,7 @@ async def run_tsc_and_eslint(
     Returns ``(ok, errors)``. Skips when ``npx``/``tsc`` is not installed.
     """
     if not shutil.which("npx"):
-        return True, []
+        return False, ["TypeScript validation unavailable (npx not found in worker)"]
 
     errors: list[str] = []
     with tempfile.TemporaryDirectory(prefix="pandora-feedback-") as tmp:

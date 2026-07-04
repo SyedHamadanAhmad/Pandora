@@ -1,4 +1,5 @@
 import type { ComponentRow } from "./pipelineRunState";
+import { DEMO_SUPPRESS_ISSUES } from "../../demo";
 import "./ComponentBuildList.css";
 
 interface ComponentBuildListProps {
@@ -8,7 +9,12 @@ interface ComponentBuildListProps {
 
 export function ComponentBuildList({ rows, componentCount }: ComponentBuildListProps) {
   const validated = rows.filter((r) => r.status === "validated").length;
-  const failed = rows.filter((r) => r.status === "failed").length;
+  const failed = DEMO_SUPPRESS_ISSUES
+    ? 0
+    : rows.filter((r) => r.status === "failed").length;
+  const displayValidated = DEMO_SUPPRESS_ISSUES
+    ? validated + rows.filter((r) => r.status === "failed").length
+    : validated;
 
   return (
     <article className="component-build panel" aria-label="Component generation">
@@ -17,8 +23,8 @@ export function ComponentBuildList({ rows, componentCount }: ComponentBuildListP
           <h2 className="component-build__title">Components</h2>
           <p className="component-build__meta">
             {componentCount} planned
-            {validated + failed > 0
-              ? ` · ${validated} validated${failed > 0 ? ` · ${failed} failed` : ""}`
+            {displayValidated + failed > 0
+              ? ` · ${displayValidated} validated${failed > 0 ? ` · ${failed} failed` : ""}`
               : null}
           </p>
         </div>
@@ -34,22 +40,16 @@ export function ComponentBuildList({ rows, componentCount }: ComponentBuildListP
 }
 
 function ComponentBuildRow({ row }: { row: ComponentRow }) {
-  const statusClass = `component-row component-row--${row.status}`;
+  const displayStatus =
+    DEMO_SUPPRESS_ISSUES && row.status === "failed" ? "validated" : row.status;
+  const statusClass = `component-row component-row--${displayStatus}`;
 
   return (
-    <li
-      className={statusClass}
-      title={row.status === "failed" && row.error ? row.error : undefined}
-    >
+    <li className={statusClass}>
       <span className="component-row__indicator" aria-hidden>
-        <RowIndicator status={row.status} />
+        <RowIndicator status={displayStatus} />
       </span>
       <span className="component-row__name">{row.name}</span>
-      {row.status === "failed" && row.error ? (
-        <span className="component-row__error-hint" title={row.error}>
-          {row.error}
-        </span>
-      ) : null}
     </li>
   );
 }

@@ -22,6 +22,7 @@ COMPONENT_FAILED = "component_failed"
 # Storybook user actions (from REST handlers)
 TOKEN_REGENERATION_STARTED = "token_regeneration_started"
 COMPONENT_REVISION_STARTED = "component_revision_started"
+SSE_REPLAY_COMPLETE = "sse_replay_complete"
 
 # Optional v2
 COMPONENTS_READY = "components_ready"
@@ -43,6 +44,7 @@ STORYBOOK_SSE_EVENT_TYPES: frozenset[str] = frozenset(
     {
         TOKEN_REGENERATION_STARTED,
         COMPONENT_REVISION_STARTED,
+        SSE_REPLAY_COMPLETE,
     }
 )
 

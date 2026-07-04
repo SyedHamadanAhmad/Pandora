@@ -1,3 +1,4 @@
+import { DEMO_SUPPRESS_ISSUES, demoComponentStatus } from "../demo";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { getComponentDetail } from "../api/storybook";
@@ -11,7 +12,6 @@ import {
 } from "../features/storybook/mergePreviewProps";
 import { StatusBadge } from "../components/StatusBadge";
 import { useReviseComponent } from "../hooks/useReviseComponent";
-import { useStorybookOverview } from "../hooks/useStorybookOverview";
 import { useStorybookStore } from "../stores/storybookStore";
 import { retryMessageFromError } from "../utils/refineMessage";
 import "./StorybookComponentPage.css";
@@ -33,7 +33,6 @@ export function StorybookComponentPage() {
   const componentId = Number(componentIdParam);
   const overviewVersion = useStorybookStore((s) => s.overviewVersion);
 
-  useStorybookOverview(Number.isFinite(projectId) ? projectId : null);
   const { revise, isRevisePending } = useReviseComponent(
     Number.isFinite(projectId) ? projectId : null,
   );
@@ -128,7 +127,7 @@ export function StorybookComponentPage() {
     return <p className="storybook-component__status">Loading component…</p>;
   }
 
-  if (error && !data) {
+  if (error && !data && !DEMO_SUPPRESS_ISSUES) {
     return (
       <div className="storybook-component panel">
         <p className="storybook-component__error" role="alert">
@@ -157,6 +156,8 @@ export function StorybookComponentPage() {
 
   const sandpackKey = `${component.id}-${component.updatedAt}-${tsx?.length ?? 0}`;
 
+  const displayStatus = demoComponentStatus(component.status);
+
   return (
     <div className="storybook-workspace">
       <header className="storybook-workspace__header">
@@ -166,14 +167,14 @@ export function StorybookComponentPage() {
         <div className="storybook-workspace__title-row">
           <h1 className="storybook-workspace__title">{component.name}</h1>
           <div className="storybook-workspace__title-actions">
-            {component.status === "failed" ? (
+            {component.status === "failed" && !DEMO_SUPPRESS_ISSUES ? (
               <ComponentRetryButton
                 onClick={handleRetry}
                 busy={revisePending}
                 disabled={busy && !revisePending}
               />
             ) : null}
-            <StatusBadge status={component.status} />
+            <StatusBadge status={displayStatus} />
           </div>
         </div>
         {busy ? (
@@ -183,7 +184,7 @@ export function StorybookComponentPage() {
               : "Validating component…"}
           </p>
         ) : null}
-        {component.errorReason ? (
+        {component.errorReason && !DEMO_SUPPRESS_ISSUES ? (
           <p className="storybook-workspace__error" role="status">
             {component.errorReason}
           </p>
@@ -231,6 +232,7 @@ export function StorybookComponentPage() {
           )}
 
           <RefineComponentPanel
+            key={component.id}
             disabled={busy}
             busy={revisePending}
             onSubmit={handleRefine}

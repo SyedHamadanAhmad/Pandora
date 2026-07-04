@@ -46,6 +46,7 @@ export function buildSandpackFiles(options: {
   cssCode: string | null | undefined;
   designTokens: Record<string, unknown>;
   previewProps: Record<string, unknown>;
+  suppressPreviewErrors?: boolean;
 }): SandpackFiles {
   const exportName = extractComponentExportName(options.tsxCode, options.componentName);
   const hasCss = Boolean(options.cssCode?.trim());
@@ -60,7 +61,47 @@ export function buildSandpackFiles(options: {
   const propsObjectSrc =
     literalLines.length > 0 ? `${literalLines.join(",\n  ")},\n` : "";
 
-  const appCode = `import "./tokens.css";
+  const previewBody = `    <div className="sandpack-preview-root" style={{ padding: 24 }}>
+      <${exportName} {...previewProps} />
+    </div>`;
+
+  const appCode = options.suppressPreviewErrors
+    ? `import "./tokens.css";
+import React from "react";
+import { ${exportName} } from "./Component";
+
+const previewProps: Record<string, unknown> = {
+  ${propsObjectSrc}};
+
+class PreviewErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean }
+> {
+  state = { hasError: false };
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch() {}
+
+  render() {
+    if (this.state.hasError) {
+      return <div className="sandpack-preview-root" style={{ padding: 24 }} />;
+    }
+    return this.props.children;
+  }
+}
+
+export default function App() {
+  return (
+    <PreviewErrorBoundary>
+${previewBody}
+    </PreviewErrorBoundary>
+  );
+}
+`
+    : `import "./tokens.css";
 import { ${exportName} } from "./Component";
 
 const previewProps: Record<string, unknown> = {
@@ -68,9 +109,7 @@ const previewProps: Record<string, unknown> = {
 
 export default function App() {
   return (
-    <div className="sandpack-preview-root" style={{ padding: 24 }}>
-      <${exportName} {...previewProps} />
-    </div>
+${previewBody}
   );
 }
 `;

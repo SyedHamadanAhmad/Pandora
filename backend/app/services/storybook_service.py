@@ -21,6 +21,7 @@ from app.schemas.storybook import (
 from app.services.design_data import (
     components_for_project,
     latest_schema_for_project,
+    schema_for_component,
     spec_for_component,
     truncate_text,
 )
@@ -124,7 +125,7 @@ async def build_component_detail(
             detail="Component not found",
         )
 
-    schema = await latest_schema_for_project(session, project.id)
+    schema = await schema_for_component(session, component)
     if schema is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

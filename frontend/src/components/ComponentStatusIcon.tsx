@@ -1,4 +1,5 @@
 import type { ComponentStatus } from "../api/types";
+import { demoComponentStatus } from "../demo";
 import "./ComponentStatusIcon.css";
 
 const LABELS: Record<ComponentStatus, string> = {
@@ -26,13 +27,14 @@ function iconChar(status: ComponentStatus): string {
 }
 
 export function ComponentStatusIcon({ status }: { status: ComponentStatus }) {
+  const display = demoComponentStatus(status);
   return (
     <span
-      className={`component-status-icon component-status-icon--${status}`}
-      title={LABELS[status]}
-      aria-label={LABELS[status]}
+      className={`component-status-icon component-status-icon--${display}`}
+      title={LABELS[display]}
+      aria-label={LABELS[display]}
     >
-      {iconChar(status)}
+      {iconChar(display)}
     </span>
   );
 }

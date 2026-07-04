@@ -17,3 +17,7 @@ export async function login(email: string, password: string) {
 export async function logout() {
   return apiFetch<void>("/api/auth/logout", { method: "POST" });
 }
+
+export async function getMe() {
+  return apiFetch<{ userId: number }>("/api/auth/me");
+}

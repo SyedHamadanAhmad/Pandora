@@ -34,6 +34,17 @@ async def latest_schema_for_project(
     )
 
 
+async def schema_for_component(
+    session: AsyncSession,
+    component: Component,
+) -> DesignSchema | None:
+    """Return the schema row the component was generated from, not necessarily the latest."""
+    schema = await session.get(DesignSchema, component.schema_id)
+    if schema is not None:
+        return schema
+    return await latest_schema_for_project(session, component.project_id)
+
+
 def spec_for_component(schema: DesignSchema | None, spec_index: int) -> dict[str, Any]:
     if schema is None or not schema.component_specs:
         return {}

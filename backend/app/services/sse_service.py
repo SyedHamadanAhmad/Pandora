@@ -183,6 +183,13 @@ async def stream_chunks(
     async for event in replay_stream(project_id, after_id=last_event_id):
         yield format_sse_message(event)
 
+    if last_event_id is None:
+        replay_done = {
+            "type": "sse_replay_complete",
+            "projectId": project_id,
+        }
+        yield format_sse_message(replay_done)
+
     subscription = subscribe(project_id)
     while True:
         try:

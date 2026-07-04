@@ -1,3 +1,4 @@
+import { DEMO_SUPPRESS_ISSUES } from "../../demo";
 import type { DesignBriefReadyEvent } from "../../api/types";
 import "./DesignBrief.css";
 
@@ -98,7 +99,7 @@ export function DesignBrief({ data }: DesignBriefProps) {
         </section>
       ) : null}
 
-      {data.inputGaps.length > 0 ? (
+      {data.inputGaps.length > 0 && !DEMO_SUPPRESS_ISSUES ? (
         <section className="design-brief__section design-brief__section--gaps">
           <h3 className="design-brief__label">Input gaps</h3>
           <ul className="design-brief__gaps">

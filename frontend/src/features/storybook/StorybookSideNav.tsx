@@ -1,5 +1,6 @@
 import { Link, NavLink, useParams } from "react-router-dom";
 import type { StorybookComponentSummary } from "../../api/types";
+import { demoComponentStatus } from "../../demo";
 import "./StorybookSideNav.css";
 
 function statusIcon(status: StorybookComponentSummary["status"]): string {
@@ -39,7 +40,9 @@ export function StorybookSideNav({ components, loading }: StorybookSideNavProps)
         <p className="storybook-sidenav__hint">No components yet</p>
       ) : (
         <ul className="storybook-sidenav__list">
-          {components.map((c) => (
+          {components.map((c) => {
+            const displayStatus = demoComponentStatus(c.status);
+            return (
             <li key={c.id}>
               <NavLink
                 to={`${base}/components/${c.id}`}
@@ -49,15 +52,16 @@ export function StorybookSideNav({ components, loading }: StorybookSideNavProps)
                 title={c.name}
               >
                 <span
-                  className={`storybook-sidenav__icon storybook-sidenav__icon--${c.status}`}
+                  className={`storybook-sidenav__icon storybook-sidenav__icon--${displayStatus}`}
                   aria-hidden
                 >
-                  {statusIcon(c.status)}
+                  {statusIcon(displayStatus)}
                 </span>
                 <span className="storybook-sidenav__name">{c.name}</span>
               </NavLink>
             </li>
-          ))}
+            );
+          })}
         </ul>
       )}
     </nav>

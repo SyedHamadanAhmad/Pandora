@@ -6,6 +6,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { demoShouldShowToast } from "../../demo";
 import { ToastStack } from "./ToastStack";
 import type { ToastItem, ToastVariant } from "./types";
 
@@ -29,6 +30,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
   const push = useCallback(
     (message: string, variant: ToastVariant = "warning") => {
+      if (!demoShouldShowToast(variant)) return;
       const id =
         typeof crypto !== "undefined" && crypto.randomUUID
           ? crypto.randomUUID()

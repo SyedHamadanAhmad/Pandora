@@ -3,7 +3,6 @@ import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-do
 import { logout } from "../api/auth";
 import { listProjects } from "../api/projects";
 import type { Project } from "../api/types";
-import { setAuthed } from "../routes/ProtectedRoute";
 import "./AppShell.css";
 
 export function AppShell() {
@@ -40,7 +39,6 @@ export function AppShell() {
 
   const signOut = async () => {
     await logout();
-    setAuthed(false);
     navigate("/login");
   };
 

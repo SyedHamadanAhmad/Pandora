@@ -23,7 +23,8 @@ from app.services.storage_service import (
     upload_thread_image,
     validate_image_count,
 )
-from pandora_shared.enums import MessageRole
+from app.services.url_validation import assert_safe_http_url
+from pandora_shared.enums import MessageRole, ProjectStatus
 
 MAX_REFERENCE_URLS = 3
 
@@ -66,6 +67,17 @@ async def create_thread_message(
 ) -> CreateThreadResponse:
     project = await get_project_for_user(db, project_id, user_id)
 
+    if project.status == ProjectStatus.running:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Pipeline already running for this project",
+        )
+    if project.status == ProjectStatus.completed:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Project already has a design library; create a new project to re-run",
+        )
+
     input_urls = _parse_urls_field(urls)
     image_files = images or []
 
@@ -74,6 +86,16 @@ async def create_thread_message(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"At most {MAX_REFERENCE_URLS} reference URLs allowed",
         )
+
+    if input_urls:
+        for url in input_urls:
+            try:
+                assert_safe_http_url(url)
+            except ValueError as exc:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=str(exc),
+                ) from exc
 
     try:
         validate_image_count(image_files)
